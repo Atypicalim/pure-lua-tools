@@ -56,7 +56,7 @@ events:triggerEvent('testEvent', 1)
 events:triggerEvent('testEvent', 2)
 events:triggerEvent('testEvent', 3)
 events:triggerEvent('testEvent', 4)
-events:triggerEvent('testEvent', 5
+events:triggerEvent('testEvent', 5)
 
 -- callback1 receive: 1
 -- callback2 receive: 1
