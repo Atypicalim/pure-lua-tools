@@ -2,10 +2,10 @@
 
 0. About
 
-> there are some useful tools like class, events for lua ...
+> there are some useful tools for lua, u can require `initialize.lua` file and enjoy the tools ...
 
 ```lua
-require('scripts/tools/initialize')
+require('./initialize')
 -- do something with tools
 ```
 
@@ -72,14 +72,24 @@ events:triggerEvent('testEvent', 5
 3. files
 
 ```lua
-files.write('test.txt', 'content...')
-local content = files.read('test.txt')
-local fileNames = files.list('some/folder/name/')
+-- write, read
+local fileName = "some/file/nam.txt"
+files.write(fileName, 'content...')
+files.is_file(fileName)
+local content = files.read(fileName)
+files.delete(fileName)
+-- list dir
+local dirName = 'some/folder/name/'
+files.is_folder(dirName)
+local fileNames = files.list(dirName)
+-- size
+files.size(fileName)
 ```
 
 4. json
 
 ```lua
+-- json.null stands for lua nil
 local test = {
     [1] = 'numberKey',
     boolenValue = true,
@@ -89,11 +99,15 @@ local test = {
     },
     arrayValue = {"enjoy", "it", "!"},
 }
+
+-- encode
 local s = json.encode(test)
 print(s)
+-- {"1":"numberKey","objectValue":{"stringValue":"json is ready!"},"nullValue":null,"arrayValue":["enjoy","it","!"],"boolenValue":true}
+
+-- decode
 local t = json.decode(s)
 print(t)
--- {"1":"numberKey","objectValue":{"stringValue":"json is ready!"},"nullValue":null,"arrayValue":["enjoy","it","!"],"boolenValue":true}
 -- table: 010A3D40
 ```
 
@@ -104,15 +118,19 @@ print(t)
 local value = table.new({
     key = "value",
 })
--- table to string, string to table
+
+-- encode, decode
 local s = value:encode() -- lua script string of the table value
 local t = s:decode() -- table value of the script string
--- write to file, read from file
+
+-- write, read
 value:write_to_file('test.txt')
 local t = table.read_from_file('test.txt')
+
 -- keys, values
 local keys = value:keys()
 local values = value:values()
+
 -- merge
 local t = value:merge({newKey= "newValue"})
 ```
@@ -120,6 +138,7 @@ local t = value:merge({newKey= "newValue"})
 6. timer
 
 ```lua
+-- sync
 timer.async(function()
     timer.sleep(1)
     print('one')
@@ -128,14 +147,23 @@ timer.async(function()
     timer.sleep(1)
     print('three')
 end)
+
+-- delay
 timer.delay(2, function()
     print('delay')
 end)
+
+-- start the loop
+print("start")
+print("end!")
 timer.start()
+
+-- start
 -- one
 -- delay
 -- two
 -- three
+-- end!
 ```
 
 7. string
@@ -143,12 +171,15 @@ timer.start()
 ```lua
 -- test string value with some feature
 local s = string.new('abcd')
+
 -- fill
 local r = s:center(6, ' ') -- ' abcd '
 local r = s:left(6, ' ') -- 'abcd  '
 local r = s:right(6, ' ') -- '  abcd'
+
 -- trim
 local s = s:trim() -- 'abcd'
+
 -- execute
 s:execute()
 ```
