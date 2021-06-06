@@ -70,16 +70,24 @@ function timer.async(fn)
     return co
 end
 
-function timer.delay(seconds, fn)
-    return timer_insert(seconds, fn)
-end
-
 function timer.sleep(seconds)
     local co = coroutine.running()
     timer_insert(seconds, function()
         coroutine.resume(co)
     end)
     return coroutine.yield()
+end
+
+function timer.delay(seconds, fn)
+    return timer_insert(seconds, fn)
+end
+
+function timer.circle(seconds, fn)
+    return timer.delay(seconds, function()
+        local ctx = timer.circle(seconds, fn)
+        fn(ctx)
+        timer.start()
+    end)
 end
 
 function timer.cancel(ctx)
