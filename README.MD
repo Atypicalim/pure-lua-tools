@@ -184,6 +184,22 @@ local s = s:trim() -- 'abcd'
 s:execute()
 ```
 
+8. bit
+
+```lua
+r = bit.rshift(2, 1) -- 1
+r = bit.lshift(2, 1) -- 4
+r = bit.band(1, 3) -- 1
+r = bit.bor(1, 2) -- 3
+r = bit.bxor(1, 3) -- 2
+r = bit.bnot(1) -- -2
+```
+
+9. encryption
+```lua
+encryption.md5('hello') -- 5d41402abc4b2a76b9719d911017c592
+```
+
 ---
 
 > for more feture plz read the source code ...

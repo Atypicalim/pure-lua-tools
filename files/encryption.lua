@@ -39,7 +39,7 @@ local function md5gg(a, b, c, d, x, s, t)
     return md5cmn(bit.bor(bit.band(b, d), bit.band(c, bit.bnot(d))), a, b, x, s, t)
 end
 local function md5hh(a, b, c, d, x, s, t)
-    return md5cmn(bit.bxor(b, c, d), a, b, x, s, t)
+    return md5cmn(bit.bxor(b, bit.bxor(c, d)), a, b, x, s, t)
 end
 local function md5ii(a, b, c, d, x, s, t)
     return md5cmn(bit.bxor(c, bit.bor(b, bit.bnot(d))), a, b, x, s, t)
