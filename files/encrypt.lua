@@ -1,6 +1,7 @@
 --[[
     encrypt
-]] local bit = require "bit"
+    git@github.com:kompasim/pure-lua-tools.git
+]]
 
 --[[
     Add integers, wrapping at 2^32. This uses 16-bit operations internally
