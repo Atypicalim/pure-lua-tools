@@ -32,13 +32,15 @@ function string.slash(this)
     return this:gsub('\\', '/')
 end
 
-function string.explode(this, separator)
+function string.explode(this, separator, maxCount)
+    assert(string.valid(this))
+    assert(string.valid(separator))
     local startIndex = 1
     local splitIndex = 1
     local splitArray = table.new()
     while true do
-        local foundIndex, endIndex = string.find(this, separator, startIndex)  
-        if not foundIndex then
+        local foundIndex, endIndex = string.find(this, separator, startIndex)
+        if not foundIndex or (maxCount and #splitArray >= maxCount) then
             splitArray[splitIndex] = string.sub(this, startIndex, string.len(this))
             break
         end

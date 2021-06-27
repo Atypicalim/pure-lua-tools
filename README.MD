@@ -200,6 +200,19 @@ r = bit.bnot(1) -- -2
 encryption.md5('hello') -- 5d41402abc4b2a76b9719d911017c592
 ```
 
+10. http
+
+```lua
+-- download
+http.download('http://example.xyz/some/file.txt', './file.txt')
+
+-- request
+local isOk, code, content = http.get('http://example.xyz/some/url', {queryKey = "value"}, {headerKey = "value"})
+local isOk, code, content = http.post('http://example.xyz/some/url', {bodyKey = "value"}, {headerKey = "value"})
+assert(isOk and code == 200)
+print(content)
+```
+
 ---
 
 > for more feture plz read the source code ...

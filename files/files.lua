@@ -82,7 +82,15 @@ function files.files(from, to)
 end
 
 function files.is_folder(path)
-    local cmd = "cd " .. path .. " >nul 2>nul"
+    local f = 'lua.files.log'
+    local cmd = nil
+    if tools.is_windows() then
+        cmd = "cd " .. path .. " 2> nul"
+    elseif tools.is_linux() then
+        cmd = "cd " .. path .. " > /dev/null 2>&1"
+    else
+        assert(false, "not supported")
+    end
     local _, _, code = os.execute(cmd)
     return code == 0
 end
