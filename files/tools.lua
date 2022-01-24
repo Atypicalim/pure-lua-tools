@@ -5,11 +5,11 @@
 local tools = {}
 
 function tools.is_windows()
-    return package.config:sub(1,1) == "\\"
+    return string.find(os.getenv("HOME"), '/c/Users') ~= nil
 end
 
 function tools.is_linux()
-    return package.config:sub(1,1) == "/"
+    return string.find(os.getenv("HOME"), '/home/') ~= nil
 end
 
 function tools.execute(cmd)

@@ -9,15 +9,10 @@ function http.download(url, path)
     assert(string.valid(path))
     local folder = files.get_folder(path)
     files.mk_folder(folder)
-    local cmd = nil
     local isOk = false
-    if tools.is_windows() then
-        cmd = "powershell (new-object Net.WebClient).DownloadFile('%s', '%s')"
-    elseif tools.is_linux() then
-        cmd = "curl '%s' >> '%s'"
-    else
-        assert(false, 'not supported')
-    end
+    -- cmd = "powershell (new-object Net.WebClient).DownloadFile('%s', '%s')"
+    -- cmd = "curl '%s' >> '%s'"
+    local cmd = "wget '%s' -O '%s'"
     cmd = string.format(cmd, url, path)
     local isOk, output = tools.execute(cmd)
     return isOk, output
