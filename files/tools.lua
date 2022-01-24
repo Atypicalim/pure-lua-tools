@@ -5,11 +5,11 @@
 local tools = {}
 
 function tools.is_windows()
-    return string.find(os.getenv("HOME"), '/c/Users') ~= nil
+    return string.find(os.getenv("HOME") or "", '/c/Users') ~= nil or string.find(os.getenv("path") or "", 'C:\\Users')
 end
 
 function tools.is_linux()
-    return string.find(os.getenv("HOME"), '/home/') ~= nil
+    return not tools.is_windows() and string.find(os.getenv("HOME") or "", '/home/') ~= nil
 end
 
 function tools.execute(cmd)

@@ -4,18 +4,24 @@
 
 local http = {}
 
-function http.download(url, path)
+function http.download(url, path, tp)
     assert(string.valid(url))
     assert(string.valid(path))
+    tp = tp or 'wget'
     local folder = files.get_folder(path)
     files.mk_folder(folder)
+    local cmd = nil
     local isOk = false
-    -- cmd = "powershell (new-object Net.WebClient).DownloadFile('%s', '%s')"
-    -- cmd = "curl '%s' >> '%s'"
-    local cmd = "wget '%s' -O '%s'"
+    if tp == 'pws1' then
+        cmd = "powershell (new-object Net.WebClient).DownloadFile('%s', '%s')"
+    elseif tp == 'curl' then
+        cmd = "curl '%s' >> '%s'"
+    elseif tp == 'wget' then
+        cmd = "wget '%s' -O '%s'"
+    end
     cmd = string.format(cmd, url, path)
     local isOk, output = tools.execute(cmd)
-    return isOk, output
+    return isOk, output, cmd
 end
 
 local function pws_request(url, method, params, headers)
