@@ -4,6 +4,7 @@
 
 local files = {}
 
+-- current working directory
 local cwd = nil
 function files.cwd()
     if cwd then return cwd end
@@ -11,6 +12,11 @@ function files.cwd()
     local s = output:trim() .. '/'
     cwd = s:slash()
     return cwd
+end
+
+-- current script directory
+function files.csd()
+    return files.get_folder(debug.getinfo(2).short_src)
 end
 
 function files.absolute(this)
