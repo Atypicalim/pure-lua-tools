@@ -29,4 +29,22 @@ function tools.execute(cmd)
     return isOk, output, code
 end
 
+function tools.get_current_script_absolute_folder()
+    local cwd = files.cwd()
+    local info = debug.getinfo(2)
+    local name = info.short_src
+    local absolutePath = files.cwd() .. info.short_src
+    local absoluteFolder = files.get_folder(absolutePath)
+    return absoluteFolder
+end
+
+function tools.get_current_script_relative_folder()
+    local cwd = files.cwd()
+    local info = debug.getinfo(2)
+    local name = info.short_src
+    local relativePath = "./" .. info.short_src
+    local relativeFolder = files.get_folder(relativePath)
+    return relativeFolder
+end
+
 return tools
