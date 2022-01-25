@@ -13,11 +13,11 @@ function http.download(url, path, tp)
     local cmd = nil
     local isOk = false
     if tp == 'pws1' then
-        cmd = "powershell (new-object Net.WebClient).DownloadFile('%s', '%s')"
+        cmd = [[powershell "(new-object Net.WebClient).DownloadFile('%s', '%s')"]]
     elseif tp == 'curl' then
-        cmd = "curl -L '%s' -o '%s' --max-redirs 3"
+        cmd = [[curl -L '%s' -o '%s' --max-redirs 3]]
     elseif tp == 'wget' then
-        cmd = "wget '%s' -O '%s'"
+        cmd = [[wget '%s' -O '%s']]
     end
     cmd = string.format(cmd, url, path)
     local isOk, output, code = tools.execute(cmd)
