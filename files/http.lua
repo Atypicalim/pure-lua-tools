@@ -15,13 +15,13 @@ function http.download(url, path, tp)
     if tp == 'pws1' then
         cmd = "powershell (new-object Net.WebClient).DownloadFile('%s', '%s')"
     elseif tp == 'curl' then
-        cmd = "curl '%s' >> '%s'"
+        cmd = "curl -L '%s' -o '%s' --max-redirs 3"
     elseif tp == 'wget' then
         cmd = "wget '%s' -O '%s'"
     end
     cmd = string.format(cmd, url, path)
-    local isOk, output = tools.execute(cmd)
-    return isOk, output, cmd
+    local isOk, output, code = tools.execute(cmd)
+    return isOk, output, code, cmd
 end
 
 local function pws_request(url, method, params, headers)

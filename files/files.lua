@@ -7,12 +7,8 @@ local files = {}
 local cwd = nil
 function files.cwd()
     if cwd then return cwd end
-    os.execute("cd > cd.tmp")
-    local f = io.open("cd.tmp", r)
-    local d = f:read("*a")
-    f:close()
-    os.remove("cd.tmp")
-    local s = d:trim():trim() .. '/'
+    local isOk, output, code = tools.execute("pwd")
+    local s = output:trim() .. '/'
     cwd = s:slash()
     return cwd
 end
@@ -82,23 +78,13 @@ function files.files(from, to)
 end
 
 function files.is_folder(path)
-    local f = 'lua.files.log'
-    local cmd = nil
-    if tools.is_windows() then
-        cmd = "cd " .. path .. " 2> nul"
-    elseif tools.is_linux() then
-        cmd = "cd " .. path .. " > /dev/null 2>&1"
-    else
-        assert(false, "not supported")
-    end
-    local _, _, code = os.execute(cmd)
+    local a, b, code = tools.execute("cd " .. path)
     return code == 0
 end
 
 function files.mk_folder(path)
     if files.is_folder(path) then return end
-    local cmd = 'mkdir "' .. path .. '"'
-    local _, _, code = os.execute(cmd)
+    local _, _, code = tools.execute('mkdir "' .. path .. '"')
     return code == 0
 end
 
