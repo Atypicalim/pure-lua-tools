@@ -34,16 +34,16 @@ function files.relative(this)
     return this:gsub(files.cwd(), '')
 end
 
-function files.write(path, content)
-    f = io.open(path, "w")
+function files.write(path, content, mode)
+    local f = io.open(path, mode or "w")
     if not f then return false end
     f:write(content)
     f:close()
     return true
 end
 
-function files.read(path)
-    f = io.open(path, "r")
+function files.read(path, mode)
+    local f = io.open(path, mode or "r")
     if not f then return end
     local content = f:read("*a")
     f:close()
