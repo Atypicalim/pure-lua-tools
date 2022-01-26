@@ -4,6 +4,13 @@
 
 local files = {}
 
+local delimiter = nil
+function files.delimiter()
+    if delimiter then return delimiter end
+    delimiter = string.find(os.tmpname(""), "\\") and "\\" or "/"
+    return delimiter
+end
+
 -- current working directory
 local cwd = nil
 function files.cwd()
