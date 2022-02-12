@@ -19,7 +19,7 @@ function tools.is_linux()
 end
 
 function tools.execute(cmd)
-    local path = 'lua.execute.log'
+    local path = './.lua.execute.log'
     files.delete(path)
     local command = string.format('%s >> ./%s 2>&1', cmd, path)
     local result, _, code = os.execute(command)
