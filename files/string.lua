@@ -106,3 +106,19 @@ function string.execute(this)
     assert(is_function(f), "invalid script string")
     return f()
 end
+
+function string.escape(s)
+    s = s:gsub('%%', '%%%%')
+    :gsub('^%^', '%%^')
+    :gsub('%$$', '%%$')
+    :gsub('%(', '%%(')
+    :gsub('%)', '%%)')
+    :gsub('%.', '%%.')
+    :gsub('%[', '%%[')
+    :gsub('%]', '%%]')
+    :gsub('%*', '%%*')
+    :gsub('%+', '%%+')
+    :gsub('%-', '%%-')
+    :gsub('%?', '%%?')
+    return s
+ end

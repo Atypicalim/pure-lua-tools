@@ -13,9 +13,9 @@ function http.download(url, path, tp)
     local cmd = nil
     local isOk = false
     if tp == 'curl' then
-        cmd = [[curl -L '%s' -o '%s' --max-redirs 3]]
+        cmd = [[curl -L "%s" -o "%s" --max-redirs 3]]
     elseif tp == 'wget' then
-        cmd = [[wget '%s' -O '%s']]
+        cmd = [[wget "%s" -O "%s"]]
     end
     cmd = string.format(cmd, url, path)
     local isOk, output, code = tools.execute(cmd)
@@ -49,7 +49,7 @@ local function curl_request(url, method, params, headers)
         b = string.format("-d '%s'", json.encode(params))
     end
     --
-    local cmd = "curl '%s' -i  --silent -o '%s' -X %s '%s' -d '%s'"
+    local cmd = [[curl "%s" -i  --silent -o "%s" -X %s "%s" -d "%s"]]
     cmd = string.format(cmd, url, httpContentFile, method, h, b)
     local isOk, output = tools.execute(cmd)
     local content = files.read(httpContentFile) or ""
