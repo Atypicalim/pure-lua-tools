@@ -97,7 +97,7 @@ end
 
 function files.mk_folder(path)
     if files.is_folder(path) then return end
-    local _, _, code = tools.execute('mkdir "' .. path .. '"')
+    local _, _, code = tools.execute(string.format([[mkdir -p "%s"]], path))
     return code == 0
 end
 
