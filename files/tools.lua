@@ -23,10 +23,24 @@ function tools.execute(cmd)
     files.delete(path)
     local command = string.format('%s >> ./%s 2>&1', cmd, path)
     local result, _, code = os.execute(command)
-    local isOk = result == true
+    local isOk = result == true or result == 0
     local output = files.read(path)
     files.delete(path)
     return isOk, output, code
+end
+
+function tools.get_timezone()
+    local now = os.time()
+    local utc = os.time(os.date("!*t", now))
+    local diff = os.difftime(now, utc)
+    local zone = math.floor(diff / 60 / 60)
+    return zone
+end
+
+function tools.get_milliseconds()
+    local clock = os.clock()
+    local _, milli = math.modf(clock)
+    return math.floor(os.time() * 1000 + milli * 1000)
 end
 
 return tools

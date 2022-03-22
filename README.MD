@@ -84,6 +84,10 @@ files.is_folder(dirName)
 local fileNames = files.list(dirName)
 -- size
 files.size(fileName)
+-- watch
+files.watch({'test1.txt', 'test1.txt'}, function(path, newTime)
+    print(path, os.date("modified at: %Y-%m-%d %H:%M:%S", newTime))
+end)
 ```
 
 4. json

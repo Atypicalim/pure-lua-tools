@@ -117,4 +117,63 @@ function files.get_folder(filePath)
     return string.gsub(filePath, "%a+%.%a+", "")
 end
 
+function files.modified(path, isDebug)
+    local stamp = nil
+    xpcall(function()
+        local isOk, result = tools.execute("stat -f %m " .. path) -- mac
+        if isOk then
+            stamp = result
+        end
+    end, function(err)
+        if isDebug then
+            print(err)
+        end
+    end)
+    xpcall(function()
+        local isOk, result = tools.execute("stat -c %Y " .. path) -- windows
+        if isOk then
+            stamp = result
+        end
+    end, function(err)
+        if isDebug then
+            print(err)
+        end
+    end)
+    if not stamp then
+        return -1
+    end
+    local modified = tonumber(stamp) or -1
+    return modified
+end
+
+function files.watch(paths, callback, runInit, triggerDelay, checkDelay)
+    if is_string(paths) then paths = {paths} end
+    assert(#paths >= 1, 'the paths to watch should not be empty')
+    assert(is_function(callback), 'the last argument should be a callback func')
+    if not is_boolen(runInit) then
+        runInit = true
+    end
+    checkDelay = checkDelay or 1
+    triggerDelay = triggerDelay or 1
+    local modifiedMap = {}
+    local function check(path)
+        local modifiedTime = files.modified(path)
+        if not modifiedMap[path] then
+            if runInit then
+                callback(path, modifiedTime)
+            end
+        elseif modifiedTime - modifiedMap[path] > triggerDelay then
+            callback(path, modifiedTime)
+        end
+        modifiedMap[path] = modifiedTime
+    end
+    timer.delay(0, function()
+        for i,v in ipairs(paths) do
+            check(v)
+        end
+        return checkDelay
+    end)
+    timer.start()
+end
+
 return files
