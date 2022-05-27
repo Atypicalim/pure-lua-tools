@@ -72,7 +72,6 @@ function table.count(this, countKeyType, countValueType)
     return totalCount, keyCount, valueCount
 end
 
-
 function table.is_array(this)
     local totalCount, typedCount, _ = table.count(this, 'number', nil)
     return totalCount == typedCount and typedCount == #this
@@ -81,7 +80,6 @@ end
 function table.implode(this, separator)
     return table.concat(this, separator)
 end
-
 
 table.read_from_file = function(path)
     assert(is_string(path))
@@ -172,7 +170,6 @@ function table.find_value(this, value)
         end
     end
 end
-
 
 function table.find_key(this, key)
     for k, v in pairs(this) do
