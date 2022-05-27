@@ -8,6 +8,13 @@ function table.new(v)
     return setmetatable(v or {}, {__index = table,})
 end
 
+function table.clear(this)
+    for k,v in pairs(this) do
+        this[k] = nil
+    end
+    return this
+end
+
 function table.keys(this)
     local keys = table.new()
     for key, _ in pairs(this) do
@@ -179,6 +186,39 @@ function table.find_if(this, func)
     for k, v in pairs(this) do
         if func(k, v) then
             return k, v
+        end
+    end
+end
+
+function table.reorder(this, isAsc, ...)
+    local conditions = {...} 
+    if #conditions == 0 then
+        return this
+    end
+    local condition = nil
+    table.sort(this, function(t1, t2)
+        for i = 1, #conditions do
+            condition = conditions[i]
+            if t1[condition] ~= t2[condition] then
+                if isAsc then
+                    return t1[condition] < t2[condition]
+                else
+                    return t1[condition] > t2[condition]
+                end
+            end
+        end
+    end)
+    return this
+end
+
+function table.foreach(this, func)
+    if table.is_array(this) then
+        for i,v in ipairs(this) do
+            func(i,v)
+        end
+    else
+        for k,v in pairs(this) do
+            func(k,v)
         end
     end
 end
