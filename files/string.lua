@@ -121,4 +121,12 @@ function string.escape(s)
     :gsub('%-', '%%-')
     :gsub('%?', '%%?')
     return s
- end
+end
+
+function string.starts(this, s)
+    return string.sub(this, 1, #s) == s
+end
+
+function string.ends(this, s)
+    return string.sub(this, -#s, -1) == s
+end
