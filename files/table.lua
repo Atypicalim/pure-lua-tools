@@ -163,6 +163,25 @@ function table.is_empty(this)
     return next(this) == nil
 end
 
+function table.is_equal(this, that)
+    assert(is_table(this))
+    if not is_table(that) then
+        return false
+    end
+    for k, v in pairs(this) do
+        if is_table(v) then
+            if not table.is_equal(v, that[k]) then
+                return false
+            end
+        else
+            if v ~= that[k] then
+                return false
+            end
+        end
+    end
+    return true
+end
+
 function table.find_value(this, value)
     for k, v in pairs(this) do
         if value == v then
