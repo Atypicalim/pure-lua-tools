@@ -80,7 +80,7 @@ function files.print(path)
     print("]]]]]]]")
 end
 
-function files.files(from, to)
+function files.copy(from, to)
     local f1 = io.open(from, 'rb')
     local f2 = io.open(to, 'wb')
     if not f1 or not f2 then return end

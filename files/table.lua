@@ -219,3 +219,11 @@ function table.foreach(this, func)
         end
     end
 end
+
+function table.reverse(this)
+    local ret = {}
+    for i = #this, 1, -1 do
+        table.insert(ret, this[i])
+    end
+    return ret
+end
