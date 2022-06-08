@@ -22,11 +22,11 @@ function tools.execute(cmd)
     local path = './.lua.execute.log'
     files.delete(path)
     local command = string.format('%s >> ./%s 2>&1', cmd, path)
-    local result, _, code = os.execute(command)
+    local result, _ = os.execute(command)
     local isOk = result == true or result == 0
     local output = files.read(path)
     files.delete(path)
-    return isOk, output, code
+    return isOk, output
 end
 
 function tools.get_timezone()

@@ -15,7 +15,7 @@ end
 local cwd = nil
 function files.cwd()
     if cwd then return cwd end
-    local isOk, output, code = tools.execute("pwd")
+    local isOk, output = tools.execute("pwd")
     local s = output:trim() .. '/'
     cwd = s:slash()
     return cwd
@@ -91,14 +91,14 @@ function files.copy(from, to)
 end
 
 function files.is_folder(path)
-    local a, b, code = tools.execute("cd " .. path)
-    return code == 0
+    local isOk, _ = tools.execute("cd " .. path)
+    return isOk == true
 end
 
 function files.mk_folder(path)
     if files.is_folder(path) then return end
-    local _, _, code = tools.execute(string.format([[mkdir -p "%s"]], path))
-    return code == 0
+    local isOk, _ = tools.execute(string.format([[mkdir "%s"]], path))
+    return isOk == true
 end
 
 function files.list(path)
