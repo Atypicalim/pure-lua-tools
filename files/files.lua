@@ -130,9 +130,13 @@ function files.modified(path, isDebug)
         end
     end)
     xpcall(function()
-        local isOk, result = tools.execute("stat -c %Y " .. path) -- windows
+        local isOk, result = tools.execute([[forfiles /M ]] .. path .. [[ /C "cmd /c echo @fdate_@ftime"]]) -- windows
         if isOk then
-            stamp = result
+            result = string.trim(result or "")
+        end
+        local year, month, day, hour, minute, second = string.match(result, "(%d+)%/(%d+)%/(%d+)_(%d+):(%d+):(%d+)")
+        if year then
+            stamp = os.time({year = year, month = month, day = day, hour = hour, min = minute, sec = second})
         end
     end, function(err)
         if isDebug then
