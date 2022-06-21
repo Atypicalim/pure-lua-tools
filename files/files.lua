@@ -122,7 +122,7 @@ function files.list(path)
 end
 
 function files.get_folder(filePath)
-    return string.gsub(filePath, "%a+%.%a+", "")
+    return string.gsub(filePath, "[^\\/]+%.[^\\/]+", "")
 end
 
 function files.modified(path, isDebug)
