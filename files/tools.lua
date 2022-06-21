@@ -7,8 +7,8 @@ local tools = {}
 local isWindows = nil
 function tools.is_windows()
     if is_boolen(isWindows) then return isWindows end
-    isWindows = string.find(os.getenv("HOME") or "", '/c/Users') ~= nil or string.find(os.getenv("path") or "", 'C:\\Users')
-    return isWindows
+    isWindows = string.find(os.getenv("HOME") or "", '/c/Users') ~= nil or string.find(os.getenv("path") or "", 'C:\\Users') ~= nil
+    return isWindows 
 end
 
 local isLinux = nil

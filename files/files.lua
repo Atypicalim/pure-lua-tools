@@ -15,15 +15,23 @@ end
 local cwd = nil
 function files.cwd()
     if cwd then return cwd end
-    local isOk, output = tools.execute("pwd")
-    local s = output:trim() .. '/'
-    cwd = s:slash()
+    local isOk, output = nil, nil
+    if tools.is_windows() then
+        isOk, output = tools.execute("cd")
+    elseif tools.is_linux() then
+        isOk, output = tools.execute("pwd")
+    end
+    assert(isOk and output ~= nil)
+    cwd = output:trim():slash() .. '/'
     return cwd
 end
 
 -- current script directory
 function files.csd()
-    return files.get_folder(debug.getinfo(2).short_src)
+    local info = debug.getinfo(2)
+    local path = info.short_src
+    assert(path ~= nil)
+    return files.cwd() .. files.get_folder(path) .. '/'
 end
 
 function files.absolute(this)
