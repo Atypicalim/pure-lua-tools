@@ -27,10 +27,11 @@ function files.cwd()
 end
 
 -- current script directory
-function files.csd()
-    local info = debug.getinfo(2)
+function files.csd(thread)
+    local info = debug.getinfo(thread or 2)
     local path = info.short_src
     assert(path ~= nil)
+    path = path:trim():slash()
     return files.cwd() .. files.get_folder(path) .. '/'
 end
 
