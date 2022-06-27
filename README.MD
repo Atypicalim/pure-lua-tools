@@ -217,6 +217,30 @@ assert(isOk and code == 200)
 print(content)
 ```
 
+11. Object
+
+```lua
+-- new class
+local Human = Object:ext()
+function Human:init()
+    print('human...')
+end
+-- extended class
+local Man = Human:ext()
+function Man:init()
+    Human.init(self)
+    print('man...')
+end
+-- a object
+local alex = Man:new()
+print(alex:is(Man))
+print(alex:is(Human))
+-- human...
+-- man...
+-- true
+-- true
+```
+
 ---
 
 > for more feture plz read the source code ...
