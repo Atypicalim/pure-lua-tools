@@ -235,11 +235,9 @@ end
 local alex = Man:new()
 print(alex:is(Man))
 print(alex:is(Human))
--- human...
--- man...
--- true
--- true
 ```
+
+![log_test](./others/test_object.png)
 
 12. Log
 
