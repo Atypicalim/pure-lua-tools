@@ -1,5 +1,5 @@
 --[[
-    storage
+    log
 ]]
 
 local Log = class("Log")
