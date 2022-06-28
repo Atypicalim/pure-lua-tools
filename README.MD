@@ -245,7 +245,6 @@ print(alex:is(Human))
 
 ```lua
 local log = Log('log.txt', 'TEST', Log.LEVEL.USER, Log.COLOR.TAG_BG_CONTENT_FG)
-local log = Log('log.txt', 'TEST', Log.LEVEL.USER, Log.COLOR.TAG_BG_CONTENT_FG)
 log:user('time:%d', os.time())
 log:error('error ...')
 log:warn('warn ...')
