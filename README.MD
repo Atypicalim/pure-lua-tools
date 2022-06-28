@@ -245,11 +245,15 @@ print(alex:is(Human))
 
 ```lua
 local log = Log('log.txt', 'TEST', Log.LEVEL.USER, Log.COLOR.TAG_BG_CONTENT_FG)
--- debug, info, warn, error, user
+local log = Log('log.txt', 'TEST', Log.LEVEL.USER, Log.COLOR.TAG_BG_CONTENT_FG)
 log:user('time:%d', os.time())
---  [TEST_2022-06-29_00:07:27]   USER  : START->TEST 
---  [TEST_2022-06-29_00:07:27]   USER  : time:1656432447
+log:error('error ...')
+log:warn('warn ...')
+log:info('info ...')
+log:debug('debug ...')
 ```
+
+![log_test](./others/test_log.png)
 
 ---
 
