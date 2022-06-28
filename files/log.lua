@@ -51,7 +51,7 @@ function Log:__init__(path, name, level, color)
         assert(self._file ~= nil, 'invalid log file!')
     end
     self._valid = true
-    self:write(string.format("START->%s", self._name))
+    self:_write(Log.LEVEL.USER, "START->%s", self._name)
 end
 
 function Log:close()
@@ -88,7 +88,7 @@ function Log:_write(level, content, ...)
     end
 end
 
-function Log:write(content, ...)
+function Log:user(content, ...)
     self:_write(Log.LEVEL.USER, content, ...)
 end
 
