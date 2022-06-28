@@ -6,14 +6,14 @@ local tools = {}
 
 local isWindows = nil
 function tools.is_windows()
-    if is_boolen(isWindows) then return isWindows end
+    if is_boolean(isWindows) then return isWindows end
     isWindows = string.find(os.getenv("HOME") or "", '/c/Users') ~= nil or string.find(os.getenv("path") or "", 'C:\\Users') ~= nil
     return isWindows 
 end
 
 local isLinux = nil
 function tools.is_linux()
-    if is_boolen(isLinux) then return isLinux end
+    if is_boolean(isLinux) then return isLinux end
     isLinux = not tools.is_windows() and string.find(os.getenv("HOME") or "", '/home/') ~= nil
     return isLinux
 end

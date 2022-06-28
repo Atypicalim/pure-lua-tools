@@ -12,8 +12,8 @@ function is_number(v)
     return type(v) == 'number'
 end
 
-function is_boolen(v)
-    return type(v) == 'boolen'
+function is_boolean(v)
+    return type(v) == 'boolean'
 end
 
 function is_nil(v)

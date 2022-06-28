@@ -163,7 +163,7 @@ function files.watch(paths, callback, runInit, triggerDelay, checkDelay)
     if is_string(paths) then paths = {paths} end
     assert(#paths >= 1, 'the paths to watch should not be empty')
     assert(is_function(callback), 'the last argument should be a callback func')
-    if not is_boolen(runInit) then
+    if not is_boolean(runInit) then
         runInit = true
     end
     checkDelay = checkDelay or 1
