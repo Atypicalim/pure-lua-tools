@@ -33,11 +33,24 @@ function string.slash(this)
 end
 
 function string.explode(this, separator, maxCount)
-    assert(string.valid(this))
-    assert(string.valid(separator))
+    assert(is_string(this))
+    assert(is_string(separator))
+    local splitArray = table.new()
+    if #this == 0 then
+        return splitArray
+    end
+    if #separator == 0 then
+        for i=1,#this do
+            if #splitArray >= maxCount then
+                splitArray[i] = string.sub(this, i, string.len(this))
+                break
+            end
+            splitArray[i] = string.sub(this, i, i)
+        end
+        return splitArray
+    end
     local startIndex = 1
     local splitIndex = 1
-    local splitArray = table.new()
     while true do
         local foundIndex, endIndex = string.find(this, separator, startIndex)
         if not foundIndex or (maxCount and #splitArray >= maxCount) then
