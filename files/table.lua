@@ -101,12 +101,12 @@ local function to_string(v)
     end
 end
 
-function table.string(this, storey)
+function table.string(this, blank, keys, _storey)
     --
     assert(is_table(this))
-    storey = storey or 1
+    _storey = _storey or 1
     local result = table.new()
-    local blank = "    "
+    blank = blank or "    "
     --  
     local function convert_key(key)
         local t = type(key)
@@ -128,18 +128,25 @@ function table.string(this, storey)
     --
     local function try_convert(k, v)
         local key = convert_key(k)
-        local value = is_table(v) and table.string(v, storey + 1) or convert_value(v)
+        local value = is_table(v) and table.string(v, blank, keys, _storey + 1) or convert_value(v)
         if key and value then
-            result:insert(blank:rep(storey) .. key .. " = " .. value)
+            result:insert(blank:rep(_storey) .. key .. " = " .. value)
         end
     end
     --
     if table.is_array(this) then
         for i,v in ipairs(this) do try_convert(i, v) end
+    elseif keys then
+        for i,k in ipairs(keys) do
+            local v = this[k]
+            if v then
+                try_convert(k, v)
+            end
+        end
     else
         for k,v in pairs(this) do try_convert(k, v) end
     end
-    return string.new("{\n" .. result:implode(",\n") .. "\n" .. blank:rep(storey - 1) .. "}")
+    return string.new("{\n" .. result:implode(",\n") .. "\n" .. blank:rep(_storey - 1) .. "}")
 end
 
 function table.encode(this)

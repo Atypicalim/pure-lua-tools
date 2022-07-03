@@ -68,7 +68,7 @@ function files.size(path)
 end
 
 function files.delete(path)
-    os.remove(path)
+    return os.remove(path)
 end
 
 function files.is_file(path)
