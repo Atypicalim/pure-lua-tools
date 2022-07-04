@@ -2,7 +2,8 @@
     Object
 ]]
 
-local Object = {}
+assert(Object == nil)
+Object = {}
 Object.__index = Object
 
 function Object:init()
@@ -33,5 +34,3 @@ function Object:is(Cls)
     end
     return false
 end
-
-return Object

@@ -2,7 +2,7 @@
     bit
 ]]
 
-local bit = {}
+bit = bit or {}
 bit.WEIGHTS = {}
 bit.DIGIT = 32
 
@@ -113,5 +113,3 @@ function bit.bnot(a)
     end
     return bit.table2number(r)
 end
-
-return bit

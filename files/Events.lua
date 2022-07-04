@@ -2,7 +2,8 @@
     Events
 ]]
 
-local Events = class('Events')
+assert(Events == nil)
+Events = class('Events')
 
 function Events:__init__()
     self._eventsMap = {}
@@ -67,5 +68,3 @@ function Events:hasListener(name, listener)
     assert(type(listener) == 'function', 'event listener should be function')
     return self._eventsMap[name] ~= nil and self._eventsMap[name][listener] ~= nil
 end
-
-return Events

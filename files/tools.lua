@@ -2,7 +2,7 @@
     tools
 ]]
 
-local tools = {}
+tools = tools or {}
 
 local isWindows = nil
 function tools.is_windows()
@@ -42,5 +42,3 @@ function tools.get_milliseconds()
     local _, milli = math.modf(clock)
     return math.floor(os.time() * 1000 + milli * 1000)
 end
-
-return tools

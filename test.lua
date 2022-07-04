@@ -2,25 +2,66 @@
     test
 ]]
 
-local f = debug.getinfo(function() end)['short_src']
-local d = string.gsub(f, "%a+%.%a+", "")
-package.path = package.path .. ";" .. d .. "/?.lua;"
+local folder = "./files/"
+local orders = {
+    "lua",
+    "number",
+    "string",
+    "table",
+    "json",
+    "files",
+    "bit",
+    "encryption",
+    "timer",
+    "http",
+    "package",
+    "tools",
+    "class",
+    "Object",
+    "Events",
+    "Storage",
+    "Log",
+}
 
-local function download_and_import_by_git(gitUrl, entryName, workingDir)
-    local slashPos = string.find(string.reverse(gitUrl), "/", 1, true)
-    local pointPos = string.find(string.reverse(gitUrl), ".", 1, true)
-    assert(slashPos ~= nil and pointPos ~= nil and slashPos > pointPos, "[LUA_GIT_IMPORT] invalid url:" .. gitUrl)
-    local folderName = "." .. string.sub(gitUrl, #gitUrl - slashPos + 2, #gitUrl - pointPos) .. "/"
-    workingDir = workingDir or os.getenv("HOME")
-    assert(workingDir ~= nil, "[LUA_GIT_IMPORT] working dir not found !")
-    package.path = package.path .. ";" .. workingDir .. "/" .. folderName .. "?.lua"
-    local isOk, err = pcall(require, entryName)
-    if not isOk then
-        print('[LUA_GIT_IMPORT] downloading ...')
-        os.execute("git clone " .. gitUrl .. " " .. workingDir .. "/" .. folderName)
-        isOk, err = pcall(require, entryName)
-        assert(isOk, "[LUA_GIT_IMPORT] import failed:" .. err)
-        print('[LUA_GIT_IMPORT] import succeeded!')
-    end
+for i,v in ipairs(orders) do
+    require(folder .. v)
 end
-download_and_import_by_git("git@github.com:kompasim/pure-lua-tools.git", "initialize", "./")
+
+local function build()
+    local target = "./tools.lua"
+    local content = string.format("\n-- tools:[%s]\n", os.date("%Y-%m-%d_%H:%M:%S", os.time()))
+    print('pure-lua-tools:')
+    print('building:')
+
+    for i,name in ipairs(orders) do
+        local path = string.format("%s%s.lua", folder, name)
+        assert(files.is_file(path), 'file not found:' .. name)
+        --
+        print('including:' .. path)
+        content = content .. string.format("\n-- file:[%s]", path) .. "\n\n"
+        local code = ""
+        local skip = false
+        files.read(path):explode("\n"):foreach(function(k, v)
+            local text = string.trim(v)
+            if #text == 0 then
+                return
+            elseif string.match(text, "%-%-%[%[.*") then
+                skip = true
+                return
+            elseif skip and string.match(text, ".*%]%]") then
+                skip = false
+                return
+            elseif skip then
+                return
+            elseif string.match(text, "%-%-.*") then
+                return
+            end
+            code =  code .. v .. "\n"
+        end)
+        content = content .. code
+    end
+    print('writing:' .. target)
+    files.write(target, content)
+    print('finished!')
+end
+-- build()

@@ -2,7 +2,7 @@
     number
 ]]
 
-local number = {}
+number = number or {}
 
 function number.is_odd(v)
     return v % 2 ~= 0
@@ -19,5 +19,3 @@ end
 function number.is_float(v)
     return not number.is_int(v)
 end
-
-return number

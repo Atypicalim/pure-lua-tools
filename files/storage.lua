@@ -2,7 +2,8 @@
     storage
 ]]
 
-local Storage = class("Storage")
+assert(Storage == nil)
+Storage = class("Storage")
 
 local operationg = {}
 
@@ -84,5 +85,3 @@ function Storage:set(key, value)
     end
     return self:_write()
 end
-
-return Storage

@@ -2,7 +2,7 @@
     http
 ]]
 
-local http = {}
+http = http or {}
 
 function http.download(url, path, tp)
     assert(string.valid(url))
@@ -83,5 +83,3 @@ end
 function http.post(url, params, headers)
     return http_request(url, 'POST', params, headers)
 end
-
-return http

@@ -2,7 +2,7 @@
     encrypt
 ]]
 
-local encryption = {}
+encryption = encryption or {}
 
 --[[
     Add integers, wrapping at 2^32. This uses 16-bit operations internally
@@ -231,5 +231,3 @@ function encryption.base64_decode(data)
         return string.char(c)
     end))
 end
-
-return encryption

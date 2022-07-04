@@ -2,7 +2,8 @@
     log
 ]]
 
-local Log = class("Log")
+assert(Log == nil)
+Log = class("Log")
 
 Log.LEVEL = {
     DEBUG = 1,
@@ -108,5 +109,3 @@ end
 function Log:debug(content, ...)
     self:_write(Log.LEVEL.DEBUG, content, ...)
 end
-
-return Log

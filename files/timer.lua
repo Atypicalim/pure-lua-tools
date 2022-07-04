@@ -1,7 +1,8 @@
 --[[
     string
 ]]
-local timer = {}
+
+timer = timer or {}
 local timers = {}
 
 local function timer_insert(sec, action)
@@ -86,5 +87,3 @@ function timer.start()
         timer_check()
     end
 end
-
-return timer

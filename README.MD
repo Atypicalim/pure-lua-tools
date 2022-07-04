@@ -2,10 +2,10 @@
 
 0. About
 
-> there are some useful tools for lua, u can require `initialize.lua` file and enjoy the tools ...
+> there are some useful tools for lua, u can require `tools.lua` file and enjoy the tools ...
 
 ```lua
-require('./initialize')
+require('./tools')
 -- do something with tools
 ```
 

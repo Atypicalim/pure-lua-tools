@@ -2,7 +2,7 @@
     file
 ]]
 
-local files = {}
+files = files or {}
 
 local delimiter = nil
 function files.delimiter()
@@ -214,5 +214,3 @@ function files.watch(paths, callback, runInit, triggerDelay, checkDelay)
     end)
     timer.start()
 end
-
-return files

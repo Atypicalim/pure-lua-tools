@@ -30,7 +30,8 @@ local function new(Class, ...)
 end
 
 -- create class
-local function class(name, Base)
+assert(class == nil)
+function class(name, Base)
     -- assert values
     assert(is_string(name), "invalid class name")
     assert(is_nil(Base) or is_class(Base), "invalid class base")
@@ -57,5 +58,3 @@ local function class(name, Base)
     -- return class
     return Class, Base
 end
-
-return class
