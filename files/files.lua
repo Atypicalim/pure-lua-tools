@@ -99,6 +99,21 @@ function files.copy(from, to)
     return true
 end
 
+function files.sync(from, to)
+    assert(files.is_folder(from), 'sync from path is invalid')
+    files.mk_folder(to)
+    local t = files.list(from)
+    for i,v in ipairs(t) do
+        local fromPath = from .."/" .. v
+        local toPath = to .."/" .. v
+        if files.is_file(fromPath) then
+            files.copy(fromPath, toPath)
+        elseif files.is_folder(fromPath) then
+            files.sync(fromPath, toPath)
+        end
+    end
+end
+
 function files.is_folder(path)
     local isOk, _ = tools.execute("cd " .. path)
     return isOk == true
@@ -106,14 +121,25 @@ end
 
 function files.mk_folder(path)
     if files.is_folder(path) then return end
-    local isOk, _ = tools.execute(string.format([[mkdir "%s"]], path))
+    local isOk
+    if tools.is_windows() then
+        isOk = tools.execute(string.format([[mkdir "%s"]], path))
+    else
+        isOk = tools.execute(string.format([[mkdir -p "%s"]], path))
+    end
     return isOk == true
 end
 
 function files.list(path)
     local r = table.new()
     if not files.is_folder(path) then return r end
-    local t = io.popen('ls ' .. path):read("*all"):explode('\n')
+    local isOk, out
+    if tools.is_windows() then
+        isOk, out = tools.execute(string.format([[dir /b "%s"]], path))
+    else
+        isOk, out = tools.execute(string.format([[ls "%s"]], path))
+    end
+    t = out:explode('\n')
     for i,v in ipairs(t) do
         if is_string(v) and #v > 0 then
             table.insert(r, v)
