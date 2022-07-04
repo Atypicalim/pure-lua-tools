@@ -64,4 +64,4 @@ local function build()
     files.write(target, content)
     print('finished!')
 end
--- build()
+build()

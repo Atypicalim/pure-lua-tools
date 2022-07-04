@@ -2,7 +2,8 @@
     package
 ]]
 
-local modules = {}
+local recursiveMap = {}
+local modulesMap = {}
 
 local function load(path, env)
     local f, err = loadfile(path)
@@ -10,7 +11,7 @@ local function load(path, env)
     if env then setfenv(f, env) end
     local r, msg = pcall(f)
     assert(r == true, msg)
-    modules[path] = msg ~= nil and msg or true
+    modulesMap[path] = msg ~= nil and msg or true
     return msg
 end
 
@@ -26,19 +27,23 @@ end
 
 function package.doload(path, env)
     path = search(tostring(path))
-    if path and modules[path] then
-        return modules[path] ~= true and modules[path] or nil
+    if path and modulesMap[path] then
+        return modulesMap[path] ~= true and modulesMap[path] or nil
     end
     assert(path ~= nil)
-    return load(path, env)
+    assert(recursiveMap[path] == nil)
+    recursiveMap[path] = true
+    local r = load(path, env)
+    recursiveMap[path] = nil
+    return r
 end
 
 function package.unload(path)
     path = search(tostring(path))
-    if path and modules[path] then modules[path] = nil end
+    if path and modulesMap[path] then modulesMap[path] = nil end
 end
 
 function package.isloaded(path)
     path = search(tostring(path))
-    return path ~= nil and modules[path] ~= nil
+    return path ~= nil and modulesMap[path] ~= nil
 end
