@@ -252,6 +252,31 @@ log:debug('debug ...')
 
 ![log_test](./others/test_log.png)
 
+13. package
+
+```lua
+-- other.lua
+a = 10
+b = {}
+b.c = 'c...'
+print(b)
+return b
+
+-- test.lua
+local path = './other.lua'
+local m = package.doload(path)
+print(m)
+print(package.isloaded(path))
+print(a)
+print(m.c)
+
+-- table: 02246FB8
+-- table: 02246FB8
+-- true
+-- 10
+-- c...
+```
+
 ---
 
 > for more feture plz read the source code ...
