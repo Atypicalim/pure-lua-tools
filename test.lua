@@ -2,6 +2,10 @@
     test
 ]]
 
+local file = debug.getinfo(function() end)['short_src']
+local folder = string.gsub(file, "%a+%.%a+", "")
+package.path = package.path .. ";" .. folder .. "/?.lua;"
+
 local folder = "./files/"
 local orders = {
     "lua",
@@ -64,4 +68,4 @@ local function build()
     files.write(target, content)
     print('finished!')
 end
-build()
+-- build()
