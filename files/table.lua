@@ -253,3 +253,9 @@ function table.reverse(this)
     end
     return ret
 end
+
+function table.append(this, other)
+    for i,v in ipairs(other) do
+        table.insert(this, v)
+    end
+end
