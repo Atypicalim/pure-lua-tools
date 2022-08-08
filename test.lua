@@ -49,15 +49,15 @@ local function build()
             local text = string.trim(v)
             if #text == 0 then
                 return
-            elseif string.match(text, "%-%-%[%[.*") then
+            elseif string.match(text, "^%s*%-%-%[%[.*") then
                 skip = true
                 return
-            elseif skip and string.match(text, ".*%]%]") then
+            elseif skip and string.match(text, ".*%]%]%s*$") then
                 skip = false
                 return
             elseif skip then
                 return
-            elseif string.match(text, "%-%-.*") then
+            elseif string.match(text, "^%s*%-%-.*") then
                 return
             end
             code =  code .. v .. "\n"

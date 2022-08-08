@@ -1,5 +1,5 @@
 
--- tools:[2022-07-04_21:16:17]
+-- tools:[2022-08-08_20:15:42]
 
 -- file:[./files/lua.lua]
 
@@ -321,6 +321,7 @@ function table.string(this, blank, keys, _storey)
         if t == 'number' then
             return "[" .. key .. "]"
         elseif t == 'string' then
+            return tostring(key) -- "[\"" .. key .. "\"]"
         end
     end
     local function convert_value(value)
@@ -446,11 +447,17 @@ function table.reverse(this)
     end
     return ret
 end
+function table.append(this, other)
+    for i,v in ipairs(other) do
+        table.insert(this, v)
+    end
+end
 
 -- file:[./files/json.lua]
 
 json = json or {}
 function json.null()
+    return json.null -- so json.null() will also return json.null ; Simply set t = {first = json.null}
 end
 function json.encodable(o)
     local t = type(o)
@@ -739,6 +746,7 @@ end
 function files.modified(path, isDebug)
     local stamp = nil
     xpcall(function()
+        local isOk, result = tools.execute("stat -f %m " .. path) -- mac
         if isOk then
             stamp = result
         end
@@ -748,6 +756,7 @@ function files.modified(path, isDebug)
         end
     end)
     xpcall(function()
+        local isOk, result = tools.execute([[forfiles /M ]] .. path .. [[ /C "cmd /c echo @fdate_@ftime"]]) -- windows
         if isOk then
             result = string.trim(result or "")
         end
@@ -1179,6 +1188,7 @@ function http.download(url, path, tp)
     local cmd = nil
     local isOk = false
     if tp == 'curl' then
+        cmd = [[curl -L "%s" -o "%s" --max-redirs 3]]
     elseif tp == 'wget' then
         cmd = [[wget "%s" -O "%s"]]
     end
@@ -1209,6 +1219,7 @@ local function curl_request(url, method, params, headers)
     elseif method == "POST" then
         b = string.format("-d '%s'", json.encode(params))
     end
+    local cmd = [[curl "%s" -i  --silent -o "%s" -X %s "%s" -d "%s"]]
     cmd = string.format(cmd, url, httpContentFile, method, h, b)
     local isOk, output = tools.execute(cmd)
     local content = files.read(httpContentFile) or ""
