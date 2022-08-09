@@ -7,8 +7,7 @@ tools = tools or {}
 local isWindows = nil
 function tools.is_windows()
     if is_boolean(isWindows) then return isWindows end
-    local env = os.getenv("HOME") or ""
-    isWindows = string.find(env, '/c/Users') ~= nil or string.find(env, 'C:\\Users') ~= nil
+    isWindows = package.config:sub(1,1) == "\\"
     return isWindows 
 end
 

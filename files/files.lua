@@ -116,6 +116,7 @@ function files.sync(from, to)
 end
 
 function files.is_folder(path)
+    if not path then return false end
     local isOk, _ = tools.execute("cd " .. path)
     return isOk == true
 end

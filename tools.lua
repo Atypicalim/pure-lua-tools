@@ -1,5 +1,5 @@
 
--- tools:[2022-08-09_10:51:47]
+-- tools:[2022-08-10_01:30:33]
 
 -- file:[./files/lua.lua]
 
@@ -711,6 +711,7 @@ function files.sync(from, to)
     end
 end
 function files.is_folder(path)
+    if not path then return false end
     local isOk, _ = tools.execute("cd " .. path)
     return isOk == true
 end
@@ -1304,8 +1305,7 @@ tools = tools or {}
 local isWindows = nil
 function tools.is_windows()
     if is_boolean(isWindows) then return isWindows end
-    local env = os.getenv("HOME") or ""
-    isWindows = string.find(env, '/c/Users') ~= nil or string.find(env, 'C:\\Users') ~= nil
+    isWindows = package.config:sub(1,1) == "\\"
     return isWindows 
 end
 local isLinux = nil
