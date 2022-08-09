@@ -1,5 +1,5 @@
 
--- tools:[2022-08-08_20:15:42]
+-- tools:[2022-08-09_09:51:01]
 
 -- file:[./files/lua.lua]
 
@@ -626,7 +626,7 @@ function files.cwd()
     local isOk, output = nil, nil
     if tools.is_windows() then
         isOk, output = tools.execute("cd")
-    elseif tools.is_linux() then
+    else
         isOk, output = tools.execute("pwd")
     end
     assert(isOk and output ~= nil)
@@ -1300,13 +1300,20 @@ tools = tools or {}
 local isWindows = nil
 function tools.is_windows()
     if is_boolean(isWindows) then return isWindows end
-    isWindows = string.find(os.getenv("HOME") or "", '/c/Users') ~= nil or string.find(os.getenv("path") or "", 'C:\\Users') ~= nil
+    local env = os.getenv("HOME") or ""
+    isWindows = string.find(env, '/c/Users') ~= nil or string.find(env, 'C:\\Users') ~= nil
     return isWindows 
 end
 local isLinux = nil
 function tools.is_linux()
     if is_boolean(isLinux) then return isLinux end
     isLinux = not tools.is_windows() and string.find(os.getenv("HOME") or "", '/home/') ~= nil
+    return isLinux
+end
+local isLinux = nil
+function tools.is_mac()
+    if is_boolean(isLinux) then return isLinux end
+    isLinux = not tools.is_windows() and string.find(os.getenv("HOME") or "", '/Users/') ~= nil
     return isLinux
 end
 function tools.execute(cmd)

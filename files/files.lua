@@ -18,7 +18,7 @@ function files.cwd()
     local isOk, output = nil, nil
     if tools.is_windows() then
         isOk, output = tools.execute("cd")
-    elseif tools.is_linux() then
+    else
         isOk, output = tools.execute("pwd")
     end
     assert(isOk and output ~= nil)
