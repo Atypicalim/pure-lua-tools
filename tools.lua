@@ -1,5 +1,5 @@
 
--- tools:[2022-08-09_09:51:01]
+-- tools:[2022-08-09_10:51:47]
 
 -- file:[./files/lua.lua]
 
@@ -635,6 +635,7 @@ function files.cwd()
 end
 function files.csd(thread)
     local info = debug.getinfo(thread or 2)
+    if not info then return end
     local path = info.short_src
     assert(path ~= nil)
     path = path:trim():slash()
@@ -779,6 +780,9 @@ function files.watch(paths, callback, runInit, triggerDelay, checkDelay)
     if is_string(paths) then paths = {paths} end
     assert(#paths >= 1, 'the paths to watch should not be empty')
     assert(is_function(callback), 'the last argument should be a callback func')
+    for i, path in ipairs(paths) do
+        assert(files.is_file(path) or files.is_folder(path), 'path not found in watch:' .. tostring(path))
+    end
     if not is_boolean(runInit) then
         runInit = true
     end
