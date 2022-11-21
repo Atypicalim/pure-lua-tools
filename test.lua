@@ -25,6 +25,7 @@ local orders = {
     "Events",
     "Storage",
     "Log",
+    "Dialog",
 }
 
 for i,v in ipairs(orders) do
