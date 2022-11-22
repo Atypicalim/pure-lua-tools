@@ -4,6 +4,7 @@
 
 assert(Dialog == nil)
 Dialog = class("Log")
+local Node = class("Node")
 
 local DIALOG_HEADER = [[
 [reflection.assembly]::LoadWithPartialName( "System.Windows.Forms");
@@ -16,9 +17,12 @@ $form = New-Object Windows.Forms.Form
 $form.ClientSize         = '%d,%d'
 $form.text               = "%s"
 $form.BackColor          = "%s"
-$form.StartPosition = '%s'
+$form.StartPosition = 'CenterScreen'
 $icon = New-Object system.drawing.icon ("%s")
 $form.Icon = $icon
+$graphics = $form.createGraphics()
+$brush = new-object Drawing.SolidBrush "#ffff00"
+$pen = new-object Drawing.Pen "#ffff00"
 ]]
 
 local DIALOG_TEXT = [[
@@ -62,14 +66,14 @@ $form.CancelButton  = $button
 local DIALOG_LIST = [[
 $listBox = New-Object System.Windows.Forms.ListBox
 $listBox.Location = New-Object System.Drawing.Point(%d,%d)
-$listBox.Size = New-Object System.Drawing.Size(%d,%d)
+$listBox.Width = %d
 $listBox.Height = %d
 %s
 $form.Controls.Add($listBox)
 ]]
 
 
-local DIALOG_IMAGE = [[
+local DIALOG_PICTURE = [[
 $file = (get-item '%s')
 $img = [System.Drawing.Image]::Fromfile($file);
 $picture = new-object Windows.Forms.PictureBox
@@ -83,101 +87,362 @@ $picture.BackColor = "%s"
 $form.controls.add($picture)
 ]]
 
+local DIALOG_IMAGE = [[
+$form.add_paint({
+    $file = (get-item '%s')
+    $img = [System.Drawing.Image]::Fromfile($file);
+    $units = [System.Drawing.GraphicsUnit]::Pixel
+    $dest = new-object Drawing.Rectangle %d, %d, %d, %d
+    $src = new-object Drawing.Rectangle %d, %d, %d, %d
+    $graphics.DrawImage($img, $dest, $src, $units);
+})
+]]
+
+local DIALOG_ELLIPSE = [[
+$form.add_paint({
+    $brush.color = "%s"
+    $rect = new-object Drawing.Rectangle %d, %d, %d, %d
+    $graphics.FillEllipse($brush, $rect)
+})
+]]
+
+local DIALOG_RECTANGLE = [[
+$form.add_paint({
+    $brush.color = "%s"
+    $rect = new-object Drawing.Rectangle %d, %d, %d, %d
+    $graphics.FillRectangle($brush, $rect)
+})
+]]
+
+local DIALOG_BEZIER = [[
+$form.add_paint({
+    $pen.color = "%s"
+    $pen.width = %d
+    $p = new-object Drawing.Point %d, %d;
+    %s
+    $points = $p, %s
+    $graphics.DrawBeziers($pen, $points)
+})
+]]
+
+local DIALOG_LINE = [[
+$form.add_paint({
+    $pen.color = "%s"
+    $pen.width = %d
+    %s
+    $points = %s
+    $graphics.DrawLines($pen, $points)
+})
+]]
+
+local DIALOG_CURVE = [[
+$form.add_paint({
+    $pen.color = "%s"
+    $pen.width = %d
+    %s
+    $points = %s
+    $graphics.DrawCurve($pen, $points)
+})
+]]
+
+local DIALOG_PIE = [[
+$form.add_paint({
+    $pen.color = "%s"
+    $pen.width = %d
+    $graphics.DrawPie($pen, %d, %d, %d, %d, %d, %d)
+})
+]]
+
+local DIALOG_ARC = [[
+$form.add_paint({
+    $pen.color = "%s"
+    $pen.width = %d
+    $graphics.DrawArc($pen, %d, %d, %d, %d, %d, %d)
+})
+]]
+
+local DIALOG_POLYGON = [[
+$form.add_paint({
+    $pen.color = "%s"
+    $pen.width = %d
+    %s
+    $points = %s
+    $graphics.DrawPolygon($pen, $points)
+})
+]]
+
 local DIALOG_FOOTER = [[
 $form.ShowDialog()
 ]]
 
-function Dialog:__init__(width, height, title, background, position, icon)
-    self._code = DIALOG_HEADER;
-    width = width or 500
-    height = height or 500
-    title = title or 'Unknown'
-    background = background or "#ffffff"
-    position = position or "CenterScreen"
-    icon = icon or "E:/OTHERS/Lua/pure-lua-tools/others/test.ico"
-    self._code = self._code .. string.format(DIALOG_CREATE, width, height, title, background, position, icon);
+local TYPES = {
+    DIALOG = "DIALOG",
+    TEXT = "TEXT",
+    INPUT = "INPUT",
+    BUTTON = "BUTTON",
+    LIST = "LIST",
+    PICTURE = "PICTURE",
+    ELLIPSE = "ELLIPSE",
+    RECTANGLE = "RECTANGLE",
+    BEZIER = "BEZIER",
+    LINE = "LINE",
+    CURVE = "CURVE",
+    PIE = "PIE",
+    ARC = "ARC",
+    POLYGON = "POLYGON",
+}
 
+function Node:__init__(tp, map)
+    self.tp = tp
+    self.x = 0
+    self.y = 0
+    self.w = 100
+    self.h = 25
+    self.length = 100
+    self.background = "#222222"
+    self.color = "#cccccc"
+    self.text = "Unknown..."
+    self.font = "Microsoft Sans Serif"
+    self.size = 13
+    self.ext = nil
+    for k,v in pairs(map or {}) do
+        self[k] = v
+    end
 end
 
-function Dialog:addText(text, x, y, size, font)
-    text = text or "Text..."
-    x = x or 0
-    y = y or 0
-    size = size or 13
-    font = font or "Microsoft Sans Serif"
-    self._code = self._code .. string.format(DIALOG_TEXT, text, x, y, font, size);
+function Node:setXY(x, y)
+    self.x = x or self.x
+    self.y = y or self.y
+    return self
 end
 
-function Dialog:addInput(text, x, y, length, size, font)
-    text = text or "Input..."
-    x = x or 0
-    y = y or 50
-    length = length or 150
-    size = size or 26
-    font = font or "Microsoft Sans Serif"
-    self._code = self._code .. string.format(DIALOG_INPUT, text, x, y, font, size, length);
+function Node:setWH(w, h)
+    self.w = w or self.w
+    self.h = h or self.h
+    return self
 end
 
-function Dialog:addButton(text, x, y, w, h, flag)
+function Node:setLength(length)
+    self.length = lengthh
+    return self
+end
+
+function Node:setBackground(background)
+    self.background = background
+    return self
+end
+
+function Node:setColor(color)
+    self.color = color
+    return self
+end
+
+function Node:setText(text)
+    self.text = text
+    return self
+end
+
+function Node:setFont(font)
+    self.font = font
+    return self
+end
+
+function Node:setSize(size)
+    self.size = size
+    return self
+end
+
+function Node:setExt(ext)
+    self.ext = ext
+    return self
+end
+
+function Dialog:__init__(title, icon)
+    self._children = {}
+    self._code = ""
+    table.insert(self._children, Node(TYPES.DIALOG):setWH(500, 500):setText("Dialog..."):setExt("./others/test.ico"))
+end
+
+function Dialog:addText()
+    table.insert(self._children, Node(TYPES.TEXT):setXY(0, 0):setText(text or "Text..."))
+    return self._children[#self._children]
+end
+
+function Dialog:addInput()
+    table.insert(self._children, Node(TYPES.INPUT):setXY(nil, 35):setText(text or "Input..."))
+    return self._children[#self._children]
+end
+
+function Dialog:addButton(flag)
     local ext = ""
-    local txt = "Button"
     if flag == 1 then
         ext = DIALOG_BUTTON_EXT_OK
-        txt= "Ok"
     elseif flag == -1 then
         ext = DIALOG_BUTTON_EXT_NO
-        txt= "No"
     end
-    text = text or txt
-    x = x or 0
-    y = y or 125
-    w = w or 75
-    h = h or 25
-    self._code = self._code .. string.format(DIALOG_BUTTON, text, x, y, w, h, ext);
+    table.insert(self._children, Node(TYPES.BUTTON):setXY(nil, 75):setText("Button..."):setExt(ext))
+    return self._children[#self._children]
 end
 
-function Dialog:addList(x, y, w, h, height, items)
-    x = x or 0
-    y = y or 175
-    w = w or 75
-    h = h or 25
-    height = height or 100
+function Dialog:addList(items)
     items = items or {1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
-    local list = ""
-    for i,v in ipairs(items) do
-        list = list .. string.format([[$listBox.Items.Add('%s');]], v)
-    end
-    self._code = self._code .. string.format(DIALOG_LIST, x, y, w, h, height, list);
+    table.insert(self._children, Node(TYPES.LIST):setXY(nil, 115):setWH(150, 100):setExt(items))
+    return self._children[#self._children]
 end
 
-function Dialog:addImage(path, x, y, w, h, mode, background)
-    path = path or "E:/OTHERS/Lua/pure-lua-tools/others/test.png"
-    x = x or 0
-    y = y or 300
-    w = w or 1
-    h = h or 1
-    local with = w > 1 and tostring(w) or "$img.Size.Width * " .. tostring(w)
-    local height = h > 1 and tostring(h) or "$img.Size.Height * " .. tostring(h)
+function Dialog:addPicture(path, mode)
+    path = path or "./others/test.png"
     mode = mode or "Normal" -- AutoSize, CenterImage, StretchImage, Zoom
-    background = background or "#333333"
-    self._code = self._code .. string.format(DIALOG_IMAGE, path, x, y, with, height, mode, background);
+    table.insert(self._children, Node(TYPES.PICTURE):setXY(nil, 235):setWH(150, 150):setExt({path, mode}))
+    return self._children[#self._children]
+end
+
+function Dialog:addImage(path, fromX, fromY, fromW, fromH)
+    path = path or "./others/yellow.png"
+    fromX = fromX or 75
+    fromY = fromY or 75
+    fromW = fromW or 350
+    fromH = fromH or 350
+    table.insert(self._children, Node(TYPES.IMAGE):setXY(250, 10):setWH(200, 200):setExt({path, fromX, fromY, fromW, fromH}))
+    return self._children[#self._children]
+end
+
+function Dialog:addEllipse()
+    table.insert(self._children, Node(TYPES.ELLIPSE):setXY(0, 0):setWH(100, 100))
+    return self._children[#self._children]
+end
+
+function Dialog:addRectangle()
+    table.insert(self._children, Node(TYPES.RECTANGLE):setXY(0, 0):setWH(100, 100))
+    return self._children[#self._children]
+end
+
+function Dialog:addBezier(cPointA1, cPointB1, end1, ...)
+    local points = {cPointA1, cPointB1, end1, ...}
+    points = #points > 0 and points or {{100, 100}, {200, 10}, {200, 200}}
+    table.insert(self._children, Node(TYPES.BEZIER):setXY(0, 0):setExt(points))
+    return self._children[#self._children]
+end
+
+function Dialog:addLine(point1, point2, ...)
+    local points = {point1, point2, ...}
+    points = #points > 0 and points or {{100, 100}, {100, 200}, {200, 200}}
+    table.insert(self._children, Node(TYPES.LINE):setExt(points))
+    return self._children[#self._children]
+end
+
+function Dialog:addCurve(point1, point2, ...)
+    local points = {point1, point2, ...}
+    points = #points > 0 and points or {{100, 100}, {100, 200}, {200, 200}}
+    table.insert(self._children, Node(TYPES.CURVE):setExt(points))
+    return self._children[#self._children]
+end
+
+function Dialog:addPie(fromR, toR)
+    table.insert(self._children, Node(TYPES.PIE):setXY(100, 100):setWH(200, 200):setExt({fromR or 0, toR or 270}))
+    return self._children[#self._children]
+end
+
+function Dialog:addArc(fromR, toR)
+    table.insert(self._children, Node(TYPES.ARC):setXY(100, 100):setWH(200, 200):setExt({fromR or 0, toR or 270}))
+    return self._children[#self._children]
+end
+
+function Dialog:addPolygon(point1, point2, ...)
+    local points = {point1, point2, ...}
+    points = #points > 0 and points or {{100, 100}, {100, 200}, {200, 200}}
+    table.insert(self._children, Node(TYPES.POLYGON):setExt(points))
+    return self._children[#self._children]
+end
+
+function Dialog:_formatPoints(points)
+    local names, bodies = "", ""
+    for index,item in ipairs(points) do
+        names = names .. string.format("$p%d", index) .. (index ~= #points and "," or "")
+        bodies = bodies .. string.format("$p%s = new-object Drawing.Point %d, %d;", index, item[1], item[2])
+    end
+    return names, bodies
+end
+
+function Dialog:_processChild(i, v)
+    if v.tp == TYPES.DIALOG then
+        self._code = self._code .. string.format(DIALOG_CREATE, v.w, v.h, v.text, v.background, v.ext)
+    elseif v.tp == TYPES.TEXT then
+        self._code = self._code .. string.format(DIALOG_TEXT, v.text, v.x, v.y, v.font, v.size)
+    elseif v.tp == TYPES.INPUT then
+        self._code = self._code .. string.format(DIALOG_INPUT, v.text, v.x, v.y, v.font, v.size, v.length)
+    elseif v.tp == TYPES.BUTTON then
+        self._code = self._code .. string.format(DIALOG_BUTTON, v.text, v.x, v.y, v.w, v.h, v.ext)
+    elseif v.tp == TYPES.LIST then
+        local items = ""
+        for _,item in ipairs(v.ext) do
+            items = items .. string.format([[$listBox.Items.Add('%s');]], item)
+        end
+        self._code = self._code .. string.format(DIALOG_LIST, v.x, v.y, v.w, v.h, items)
+    elseif v.tp == TYPES.PICTURE then
+        local with = v.w > 1 and tostring(v.w) or "$img.Size.Width * " .. tostring(v.w)
+        local height = v.h > 1 and tostring(v.h) or "$img.Size.Height * " .. tostring(v.h)
+        self._code = self._code .. string.format(DIALOG_PICTURE, v.ext[1], v.x, v.y, with, height, v.ext[2], v.background)
+    elseif v.tp == TYPES.IMAGE then
+        self._code = self._code .. string.format(DIALOG_IMAGE, v.ext[1], v.x, v.y, v.w, v.h, v.ext[2], v.ext[3], v.ext[4], v.ext[5])
+    elseif v.tp == TYPES.ELLIPSE then
+        self._code = self._code .. string.format(DIALOG_ELLIPSE, v.color, v.x, v.y, v.w, v.h)
+    elseif v.tp == TYPES.RECTANGLE then
+        self._code = self._code .. string.format(DIALOG_RECTANGLE, v.color, v.x, v.y, v.w, v.h)
+    elseif v.tp == TYPES.BEZIER then
+        local names, bodies = self:_formatPoints(v.ext)
+        self._code = self._code .. string.format(DIALOG_BEZIER, v.color, v.size, v.x, v.y, bodies, names)
+    elseif v.tp == TYPES.LINE then
+        local names, bodies = self:_formatPoints(v.ext)
+        self._code = self._code .. string.format(DIALOG_LINE, v.color, v.size, bodies, names)
+    elseif v.tp == TYPES.CURVE then
+        local names, bodies = self:_formatPoints(v.ext)
+        self._code = self._code .. string.format(DIALOG_CURVE, v.color, v.size, bodies, names)
+    elseif v.tp == TYPES.PIE then
+        self._code = self._code .. string.format(DIALOG_PIE, v.color, v.size, v.x, v.y, v.w, v.h, v.ext[1], v.ext[2])
+    elseif v.tp == TYPES.ARC then
+        self._code = self._code .. string.format(DIALOG_ARC, v.color, v.size, v.x, v.y, v.w, v.h, v.ext[1], v.ext[2])
+    elseif v.tp == TYPES.POLYGON then
+        local names, bodies = self:_formatPoints(v.ext)
+        self._code = self._code .. string.format(DIALOG_POLYGON, v.color, v.size, bodies, names)
+    end
 end
 
 function Dialog:show()
+    self._code = DIALOG_HEADER;
+    for i,v in ipairs(self._children) do
+        self:_processChild(i, v)
+    end
     self._code = self._code .. string.format(DIALOG_FOOTER)
     files.write("running.ps1", self._code)
-    print(self._code)
     local isOk, r = tools.execute([[ powershell.exe -file ./running.ps1]])
     assert(isOk, 'powershell execute failed:' .. r)
+    files.delete("running.ps1")
 end
 
--- dialog = Dialog()
+function Dialog:save()
+    -- $bmp=new-object System.Drawing.Bitmap 500,500
+    -- $graphics=[System.Drawing.Graphics]::FromImage($bmp)
+    -- $graphics.Dispose()
+    -- $bmp.Save("./screenshot.png")
+end
+
+dialog = Dialog()
 -- dialog:addText()
 -- dialog:addInput()
 -- dialog:addButton()
 -- dialog:addList()
--- dialog:addImage()
--- dialog:show()
+dialog:addPicture()
+dialog:addImage()
+-- dialog:addEllipse()
+-- dialog:addRectangle():setXY(100, 175)
+-- dialog:addBezier()
+-- dialog:addLine()
+-- dialog:addCurve()
+-- dialog:addPie()
+-- dialog:addArc()
+-- dialog:addPolygon()
+dialog:show()
 
 -- # .Net methods for hiding/showing the console in the background
 -- Add-Type -Name Window -Namespace Console -MemberDefinition '
@@ -189,20 +454,3 @@ end
 -- $consolePtr = [Console.Window]::GetConsoleWindow()
 -- [Console.Window]::ShowWindow($consolePtr, 0) # hide:0, show:5
 
-
--- [reflection.assembly]::LoadWithPartialName( "System.Windows.Forms")
--- [reflection.assembly]::LoadWithPartialName( "System.Drawing")
--- $myBrush = new-object Drawing.SolidBrush green
--- $mypen = new-object Drawing.Pen black
--- $mypen.color = "red" # Set the pen color
--- $mypen.width = 5     # ste the pen line width
--- $rect = new-object Drawing.Rectangle 10, 10, 180, 180
-
--- $form = New-Object Windows.Forms.Form
--- $formGraphics = $form.createGraphics()
--- $form.add_paint({
---     $formGraphics.FillEllipse($myBrush, $rect) # draw an ellipse using rectangle object
---     $formGraphics.DrawLine($mypen, 10, 10, 190, 190) # draw a line
---     $formGraphics.DrawLine($mypen, 190, 10, 10, 190) # draw a line
--- })
--- $form.ShowDialog()
