@@ -308,6 +308,16 @@ graphic:show()
 
 ![log_test](./others/graphic.png)
 
+15. Dialog
+
+```lua
+local r = dialog.show_confirm("title...", "confirm...", YesNoCancel)
+print("result:", r)
+-- result: true
+```
+
+![log_test](./others/test_dialog.png)
+
 ---
 
 > for more feture plz read the source code ...
