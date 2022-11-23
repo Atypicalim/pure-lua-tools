@@ -108,58 +108,58 @@ end
 function dialog.select_file(title, filter, folder)
     title = title or "please select a file ..."
     filter = filter or "All files (*.*)|*.*"
-	folder = folder or ""
+    folder = folder or ""
     print(dialog_validate_folder(folder))
-	local path = dialog_execute_powershell("select_file", title, filter, dialog_validate_folder(folder))
-	if string.valid(path) then
-		return path
-	end
+    local path = dialog_execute_powershell("select_file", title, filter, dialog_validate_folder(folder))
+    if string.valid(path) then
+        return path
+    end
 end
 
 function dialog.select_folder(title, folder)
     title = title or "please select a folder ..."
-	folder = folder or ""
-	local path = dialog_execute_powershell("select_folder", title, dialog_validate_folder(folder))
-	if string.valid(path) then
-		return path
-	end
+    folder = folder or ""
+    local path = dialog_execute_powershell("select_folder", title, dialog_validate_folder(folder))
+    if string.valid(path) then
+        return path
+    end
 end
 
 function dialog.select_save(title, filter, folder)
     title = title or "please save a file ..."
     filter = filter or "All files (*.*)|*.*"
-	folder = folder or ""
-	local path = dialog_execute_powershell("select_save", title, filter, dialog_validate_folder(folder))
-	if string.valid(path) then
-		return path
-	end
+    folder = folder or ""
+    local path = dialog_execute_powershell("select_save", title, filter, dialog_validate_folder(folder))
+    if string.valid(path) then
+        return path
+    end
 end
 
 function dialog.select_color()
-	local color = dialog_execute_powershell("select_color")
-	if string.valid(color) then
+    local color = dialog_execute_powershell("select_color")
+    if string.valid(color) then
         local t = string.explode(color, ",")
         local r, g, b = tonumber(t[1]), tonumber(t[2]), tonumber(t[3])
         return r, g, b
-	end
+    end
 end
 
 function dialog.show_confirm(title, message, flag)
-	title = title or "title..."
-	message = message or "confirm..."
+    title = title or "title..."
+    message = message or "confirm..."
     flag = flag or "YesNoCancel" -- YesNoCancel, YesNo, OkCancel, OKOnly, Critical, Question, Exclamation, Information
-	local r = dialog_execute_powershell("show_confirm", title, message, flag)
+    local r = dialog_execute_powershell("show_confirm", title, message, flag)
     if r == "Yes" or r == "Ok" then return true end
     if r == "No" then return false end
     return nil
 end
 
 function dialog.show_input(title, message, default)
-	title = title or "title..."
-	message = message or "input..."
-	default = default or ""
-	local result = dialog_execute_powershell("show_input", title, message, default)
-	if string.valid(result) then
-		return result
-	end
+    title = title or "title..."
+    message = message or "input..."
+    default = default or ""
+    local result = dialog_execute_powershell("show_input", title, message, default)
+    if string.valid(result) then
+        return result
+    end
 end
