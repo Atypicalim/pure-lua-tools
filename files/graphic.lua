@@ -4,7 +4,6 @@
 
 assert(Graphic == nil)
 Graphic = class("Graphic")
-local Node = class("Node")
 
 local HIDE_CONSOLE = [[
 Add-Type -Name Window -Namespace Console -MemberDefinition '
@@ -21,10 +20,13 @@ local COMMON_HEADER = [[
 [reflection.assembly]::LoadWithPartialName( "System.Drawing");
 $brush = new-object Drawing.SolidBrush "#22ffcc"
 $pen = new-object Drawing.Pen "#22ffcc"
+$pen.width = 10
 $x = 0
 $y = 0
 $w = 250
 $h = 250
+$ax = 0.5
+$ay = 0.5
 ]]
 
 local FORM_CREATE = [[
@@ -52,14 +54,16 @@ $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 ]]
 
 local IMAGE_SAVE = [[
-$graphics.Dispose()
 $bitmap.Save("%s")
 $graphics.Dispose()
 ]]
 
-local GRAPHIC_STYLE = [[
+local GRAPHIC_COLOR = [[
 $brush.color = "%s"
 $pen.color = "%s"
+]]
+
+local GRAPHIC_SIZE = [[
 $pen.width = %d
 ]]
 
@@ -73,28 +77,40 @@ $w = %d
 $h = %d
 ]]
 
+local GRAPHIC_SCREEN = [[
+$size = new-object System.Drawing.Size $w, $h
+$graphics.CopyFromScreen(%d, %d, $x, $y, $size);
+]]
+
+local GRAPHIC_CLIP = [[
+$rect = new-object Drawing.Rectangle ($x - $ax * $w), ($y - $ay * $h), $w, $h
+$graphics.SetClip($rect)
+]]
+
 local DIALOG_TEXT = [[
 $font = new-object System.Drawing.Font "%s",%d
-$graphics.DrawString('%s', $font, $brush, $x, $y);
+$string = '%s'
+$size = $graphics.MeasureString($string, $font);
+$graphics.DrawString($string, $font, $brush, ($x - $ax * $size.Width), ($y - $ay * $size.Height));
 ]]
 
 local DIALOG_IMAGE = [[
 $file = (get-item '%s')
 $img = [System.Drawing.Image]::Fromfile($file);
 $units = [System.Drawing.GraphicsUnit]::Pixel
-$dest = new-object Drawing.Rectangle $x, $y, 200, 200
+$dest = new-object Drawing.Rectangle ($x - $ax * $w), ($y - $ay * $h), $w, $h
 $src = new-object Drawing.Rectangle %d, %d, %d, %d
 $graphics.DrawImage($img, $dest, $src, $units);
 ]]
 
 local DIALOG_ELLIPSE = [[
-$rect = new-object Drawing.Rectangle $x, $y, $w, $h
-$graphics.FillEllipse($brush, $rect);
+$rect = new-object Drawing.Rectangle ($x - $ax * $w), ($y - $ay * $h), $w, $h
+$graphics.%sEllipse(%s, $rect);
 ]]
 
 local DIALOG_RECTANGLE = [[
-$rect = new-object Drawing.Rectangle $x, $y, $w, $h
-$graphics.FillRectangle($brush, $rect);
+$rect = new-object Drawing.Rectangle ($x - $ax * $w), ($y - $ay * $h), $w, $h
+$graphics.%sRectangle(%s, $rect);
 ]]
 
 local DIALOG_LINE = [[
@@ -116,76 +132,62 @@ $graphics.DrawBeziers($pen, $points);
 ]]
 
 local DIALOG_PIE = [[
-$graphics.DrawPie($pen, $x, $y, $w, $h, %d, %d);
+$graphics.%sPie(%s, ($x - $ax * $w), ($y - $ay * $h), $w, $h, %d, %d);
 ]]
 
 local DIALOG_ARC = [[
-$graphics.DrawArc($pen, $x, $y, $w, $h, %d, %d);
+$graphics.DrawArc($pen, ($x - $ax * $w), ($y - $ay * $h), $w, $h, %d, %d);
 ]]
 
 local DIALOG_POLYGON = [[
 %s
 $points = %s
-$graphics.DrawPolygon($pen, $points);
+$graphics.%sPolygon(%s, $points);
 ]]
 
-local TYPES = {
-    STYLE = "STYLE",
-    POSITION = "POSITION",
-    SIZE = "SIZE",
-    TEXT = "TEXT",
-    ELLIPSE = "ELLIPSE",
-    RECTANGLE = "RECTANGLE",
-    BEZIER = "BEZIER",
-    LINE = "LINE",
-    CURVE = "CURVE",
-    PIE = "PIE",
-    ARC = "ARC",
-    POLYGON = "POLYGON",
-}
-
-function Node:__init__(tp, map)
-    self.tp = tp
-    self.x = 0
-    self.y = 0
-    self.w = 250
-    self.h = 250
-    self.ext = nil
-    for k,v in pairs(map or {}) do
-        self[k] = v
-    end
-end
-
-function Node:setExt(ext)
-    self.ext = ext
-    return self
-end
-
 function Graphic:__init__(w, h)
+    assert(tools.is_windows(), 'platform not supported!')
     self._w = w or 500
     self._h = h or 500
     self._children = {}
     self._code = ""
 end
 
-function Graphic:setStyle(color, size)
+function Graphic:setColor(color)
     color = color or "#eeeeee"
+    self._code = self._code .. string.format(GRAPHIC_COLOR, color, color)
+    return self
+end
+
+function Graphic:setSize(size)
     size = size or 10
-    table.insert(self._children, Node(TYPES.STYLE):setExt({color, size}))
+    self._code = self._code .. string.format(GRAPHIC_SIZE, size)
     return self
 end
 
 function Graphic:setXY(x, y)
     x = x or 0
     y = y or 0
-    table.insert(self._children, Node(TYPES.POSITION):setExt({x, y}))
+    self._code = self._code .. string.format(GRAPHIC_POSITION, x, y)
     return self
 end
 
 function Graphic:setWH(w, h)
     w = w or 0
     h = h or 0
-    table.insert(self._children, Node(TYPES.SIZE):setExt({w, h}))
+    self._code = self._code .. string.format(GRAPHIC_SIZE, w, h)
+    return self
+end
+
+function Graphic:copyScreen(fromX, fromY)
+    fromX = fromX or 0
+    fromY = fromY or 0
+    self._code = self._code .. string.format(GRAPHIC_SCREEN, fromX, fromY)
+    return self
+end
+
+function Graphic:setClip()
+    self._code = self._code .. string.format(GRAPHIC_CLIP)
     return self
 end
 
@@ -193,8 +195,8 @@ function Graphic:addText(text, size, font)
     text = text or "Text..."
     size = size or 13
     font = font or "Microsoft Sans Serif"
-    table.insert(self._children, Node(TYPES.TEXT):setExt({text, size, font}))
-    return self._children[#self._children]
+    self._code = self._code .. string.format(DIALOG_TEXT, font, size, text)
+    return self
 end
 
 function Graphic:addImage(path, fromX, fromY, fromW, fromH)
@@ -203,56 +205,77 @@ function Graphic:addImage(path, fromX, fromY, fromW, fromH)
     fromY = fromY or 0
     fromW = fromW or 250
     fromH = fromH or 250
-    table.insert(self._children, Node(TYPES.IMAGE):setExt({path, fromX, fromY, fromW, fromH}))
-    return self._children[#self._children]
+    self._code = self._code .. string.format(DIALOG_IMAGE, path, fromX, fromY, fromW, fromH)
+    return self
 end
 
-function Graphic:addEllipse()
-    table.insert(self._children, Node(TYPES.ELLIPSE))
-    return self._children[#self._children]
+function Graphic:addEllipse(isFill)
+    local mode, tool = self:_formatMode(isFill ~= false)
+    self._code = self._code .. string.format(DIALOG_ELLIPSE, mode, tool)
+    return self
 end
 
-function Graphic:addRectangle()
-    table.insert(self._children, Node(TYPES.RECTANGLE))
-    return self._children[#self._children]
+function Graphic:addRectangle(isFill)
+    local mode, tool = self:_formatMode(isFill ~= false)
+    self._code = self._code .. string.format(DIALOG_RECTANGLE, mode, tool)
+    return self
 end
 
 function Graphic:addLine(point1, point2, ...)
     local points = {point1, point2, ...}
-    points = #points > 0 and points or {{100, 100}, {100, 200}, {200, 200}}
-    table.insert(self._children, Node(TYPES.LINE):setExt(points))
+    points = #points > 0 and points or {}
+    local names, bodies = self:_formatPoints(points)
+    self._code = self._code .. string.format(DIALOG_LINE, bodies, names)
     return self._children[#self._children]
 end
 
 function Graphic:addCurve(point1, point2, ...)
     local points = {point1, point2, ...}
-    points = #points > 0 and points or {{100, 100}, {100, 200}, {200, 200}}
-    table.insert(self._children, Node(TYPES.CURVE):setExt(points))
+    points = #points > 0 and points or {}
+    local names, bodies = self:_formatPoints(points)
+    self._code = self._code .. string.format(DIALOG_CURVE, bodies, names)
     return self._children[#self._children]
 end
 
 function Graphic:addBezier(start, cPointA1, cPointB1, end1, ...)
     local points = {start, cPointA1, cPointB1, end1, ...}
-    points = #points > 0 and points or {{10, 10}, {100, 100}, {200, 10}, {200, 200}}
-    table.insert(self._children, Node(TYPES.BEZIER):setExt(points))
+    points = #points > 0 and points or {}
+    local names, bodies = self:_formatPoints(points)
+    self._code = self._code .. string.format(DIALOG_BEZIER, bodies, names)
     return self._children[#self._children]
 end
 
-function Graphic:addPie(fromR, toR)
-    table.insert(self._children, Node(TYPES.PIE):setExt({fromR or 0, toR or 270}))
-    return self._children[#self._children]
+function Graphic:addPie(fromR, toR, isFill)
+    fromR = fromR or 0
+    toR = toR or 270
+    local mode, tool = self:_formatMode(isFill ~= false)
+    self._code = self._code .. string.format(DIALOG_PIE, mode, tool, fromR, toR)
+    return self
 end
 
 function Graphic:addArc(fromR, toR)
-    table.insert(self._children, Node(TYPES.ARC):setExt({fromR or 0, toR or 270}))
+    fromR = fromR or 0
+    toR = toR or 270
+    self._code = self._code .. string.format(DIALOG_ARC, fromR, toR)
     return self._children[#self._children]
 end
 
 function Graphic:addPolygon(point1, point2, ...)
     local points = {point1, point2, ...}
-    points = #points > 0 and points or {{50, 50}, {50, 100}, {100, 100}}
-    table.insert(self._children, Node(TYPES.POLYGON):setExt(points))
+    points = #points > 0 and points or {}
+    local names, bodies = self:_formatPoints(points)
+    local mode, tool = self:_formatMode(false)
+    self._code = self._code .. string.format(DIALOG_POLYGON, bodies, names, mode, tool)
+
     return self._children[#self._children]
+end
+
+function Graphic:_formatMode(isFill)
+    if isFill then
+        return "Fill", "$brush"
+    else
+        return "Draw", "$pen"
+    end
 end
 
 function Graphic:_formatPoints(points)
@@ -264,47 +287,7 @@ function Graphic:_formatPoints(points)
     return names, bodies
 end
 
-function Graphic:_processChild(i, v)
-    if v.tp == TYPES.STYLE then
-        self._code = self._code .. string.format(GRAPHIC_STYLE, v.ext[1], v.ext[1], v.ext[2])
-    elseif v.tp == TYPES.POSITION then
-        self._code = self._code .. string.format(GRAPHIC_POSITION, v.ext[1], v.ext[2])
-    elseif v.tp == TYPES.SIZE then
-        self._code = self._code .. string.format(GRAPHIC_SIZE, v.ext[1], v.ext[2])
-    elseif v.tp == TYPES.TEXT then
-        self._code = self._code .. string.format(DIALOG_TEXT, v.ext[3], v.ext[2], v.ext[1])
-    elseif v.tp == TYPES.IMAGE then
-        self._code = self._code .. string.format(DIALOG_IMAGE, v.ext[1], v.ext[2], v.ext[3], v.ext[4], v.ext[5])
-    elseif v.tp == TYPES.ELLIPSE then
-        self._code = self._code .. string.format(DIALOG_ELLIPSE)
-    elseif v.tp == TYPES.RECTANGLE then
-        self._code = self._code .. string.format(DIALOG_RECTANGLE)
-    elseif v.tp == TYPES.LINE then
-        local names, bodies = self:_formatPoints(v.ext)
-        self._code = self._code .. string.format(DIALOG_LINE, bodies, names)
-    elseif v.tp == TYPES.CURVE then
-        local names, bodies = self:_formatPoints(v.ext)
-        self._code = self._code .. string.format(DIALOG_CURVE, bodies, names)
-    elseif v.tp == TYPES.BEZIER then
-        local names, bodies = self:_formatPoints(v.ext)
-        self._code = self._code .. string.format(DIALOG_BEZIER, bodies, names)
-    elseif v.tp == TYPES.PIE then
-        self._code = self._code .. string.format(DIALOG_PIE, v.ext[1], v.ext[2])
-    elseif v.tp == TYPES.ARC then
-        self._code = self._code .. string.format(DIALOG_ARC, v.ext[1], v.ext[2])
-    elseif v.tp == TYPES.POLYGON then
-        local names, bodies = self:_formatPoints(v.ext)
-        self._code = self._code .. string.format(DIALOG_POLYGON, bodies, names)
-    end
-end
-
-function Graphic:_processStart()
-    for i,v in ipairs(self._children) do
-        self:_processChild(i, v)
-    end
-end
-
-function Graphic:_processEnd()
+function Graphic:_runScript()
     files.write("running.ps1", self._code)
     local isOk, r = tools.execute([[ powershell.exe -file ./running.ps1]])
     assert(isOk, 'powershell execute failed:' .. r)
@@ -314,34 +297,14 @@ end
 function Graphic:show(title, icon)
     title = title or "Title..."
     icon = icon or "./others/test.ico"
-    self._code = self._code .. HIDE_CONSOLE
-    self._code = self._code .. COMMON_HEADER
-    self._code = self._code .. string.format(FORM_CREATE, self._w, self._h)
-    self:_processStart()
+    self._code = COMMON_HEADER .. string.format(FORM_CREATE, self._w, self._h) .. self._code -- HIDE_CONSOLE
     self._code = self._code .. string.format(FORM_SHOW, icon, title)
-    self:_processEnd()
+    self:_runScript()
 end
 
 function Graphic:save(path)
-    path = path or "./screenshot.png"
-    self._code = self._code .. COMMON_HEADER
-    self._code = self._code .. string.format(IMAGE_CREATE, self._w, self._h)
-    self:_processStart()
+    path = path or "./graphic.png"
+    self._code = COMMON_HEADER .. string.format(IMAGE_CREATE, self._w, self._h) .. self._code
     self._code = self._code .. string.format(IMAGE_SAVE, path)
-    self:_processEnd()
+    self:_runScript()
 end
-
-local graphic = Graphic()
-graphic:setXY(0, 0):setWH(500, 500):setStyle("#222222"):addRectangle()
-graphic:setXY(250, 50):setWH(200, 200):addImage("./others/yellow.png", 75, 75, 350, 350)
-graphic:setXY(25, 275):setWH(350, 350):addImage("./others/test.png", nil, nil, nil, nil)
-graphic:setXY(25, 150):setStyle("#ff0000"):addText("Text...", 48, nil)
--- graphic:setStyle("#2255ff"):addLine()
--- graphic:setStyle("#2255ff"):addCurve()
--- graphic:setStyle("#2255ff"):addBezier()
--- graphic:addEllipse()
--- graphic:addPie()
--- graphic:addArc()
-graphic:setStyle("#00ff00"):addPolygon()
--- graphic:show()
-graphic:save()

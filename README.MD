@@ -277,6 +277,37 @@ print(m.c)
 -- c...
 ```
 
+14. Graphic
+
+```lua
+local graphic = Graphic()
+-- stage
+graphic:setXY(250, 250):setWH(495, 495):setClip()
+graphic:setXY(250, 250):setWH(500, 500):setColor("#222222"):addRectangle()
+-- text
+graphic:setXY(125, 265):setColor("#00ff55"):addText("Text...", 48, nil)
+-- iamges
+graphic:setXY(375, 125):setWH(200, 200):addImage("./others/yellow.png", 75, 75, 350, 350)
+graphic:setXY(125, 375):setWH(128, 128):addImage("./others/test.png", 0, 0, 128, 128)
+-- lines
+graphic:setColor("#2255ff")
+graphic:addLine({75, 75}, {175, 175})
+graphic:addCurve({50, 100}, {50, 200}, {150, 200})
+graphic:addBezier({10, 10}, {100, 100}, {200, 10}, {200, 200})
+-- shapes
+graphic:setColor("#55ff55ff")
+graphic:setXY(425, 325):setWH(50, 50):addEllipse()
+graphic:setXY(375, 375):setWH(100, 100):addPie()
+graphic:setXY(375, 375):setWH(200, 200):addArc()
+graphic:setColor("#5577ffaa")
+graphic:addPolygon({75, 125}, {75, 175}, {125, 175})
+-- show or save
+graphic:show()
+-- graphic:save("./others/graphic.png")
+```
+
+![log_test](./others/graphic.png)
+
 ---
 
 > for more feture plz read the source code ...
