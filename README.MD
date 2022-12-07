@@ -316,6 +316,21 @@ print("result:", r)
 -- result: true
 ```
 
+16. Path
+
+```lua
+local path = Path()
+-- 
+print(path:set("~"):get())
+-- C:\Users\user
+print(path:push("../xyz/abc"):get())
+-- C:\Users\xyz\abc
+print(path:relative(Path("~")):get())
+-- ..\..\user
+print(Path("~"):relative(path):get())
+-- ..\xyz\abc
+```
+
 ![log_test](./others/test_dialog.png)
 
 ---

@@ -16,16 +16,18 @@ function string.prepend(this, other)
     return other .. this
 end
 
-function string.ltrim(this)
-    return string.gsub(this, "^[ \t\n\r]+", "")
+function string.ltrim(this, pattern)
+    pattern = pattern or " \t\n\r"
+    return string.gsub(this, "^[" .. pattern .. "]+", "")
 end
 
-function string.rtrim(this)
-    return string.gsub(this, "[ \t\n\r]+$", "")
+function string.rtrim(this, pattern)
+    pattern = pattern or " \t\n\r"
+    return string.gsub(this, "[" .. pattern .. "]+$", "")
 end
 
-function string.trim(this)
-    return this:ltrim():rtrim()
+function string.trim(this, pattern)
+    return this:ltrim(pattern):rtrim(pattern)
 end
 
 function string.slash(this)
