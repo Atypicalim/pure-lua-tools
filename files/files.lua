@@ -154,31 +154,16 @@ function files.get_folder(filePath)
     return string.gsub(filePath, "[^\\/]+%.[^\\/]+", "")
 end
 
-function files.modified(path, isDebug)
+function files.modified(path)
     local stamp = nil
     xpcall(function()
         local isOk, result = tools.execute("stat -f %m " .. path) -- mac
-        if isOk then
-            stamp = result
-        end
+        if isOk then stamp = result end
+        local isOk, result = tools.execute("stat -c %Y " .. path) -- linux
+        if isOk then stamp = result end
+        assert(stamp ~= nil, 'get modified stamp failed')
     end, function(err)
-        if isDebug then
-            print(err)
-        end
-    end)
-    xpcall(function()
-        local isOk, result = tools.execute([[forfiles /M ]] .. path .. [[ /C "cmd /c echo @fdate_@ftime"]]) -- windows
-        if isOk then
-            result = string.trim(result or "")
-        end
-        local year, month, day, hour, minute, second = string.match(result, "(%d+)%/(%d+)%/(%d+)_(%d+):(%d+):(%d+)")
-        if year then
-            stamp = os.time({year = year, month = month, day = day, hour = hour, min = minute, sec = second})
-        end
-    end, function(err)
-        if isDebug then
-            print(err)
-        end
+        print(err)
     end)
     if not stamp then
         return -1
@@ -187,35 +172,26 @@ function files.modified(path, isDebug)
     return modified
 end
 
-function files.watch(paths, callback, runInit, triggerDelay, checkDelay)
+function files.watch(paths, callback, triggerDelay)
     if is_string(paths) then paths = {paths} end
     assert(#paths >= 1, 'the paths to watch should not be empty')
     assert(is_function(callback), 'the last argument should be a callback func')
     for i, path in ipairs(paths) do
         assert(files.is_file(path) or files.is_folder(path), 'path not found in watch:' .. tostring(path))
     end
-    if not is_boolean(runInit) then
-        runInit = true
-    end
-    checkDelay = checkDelay or 1
     triggerDelay = triggerDelay or 1
     local modifiedMap = {}
     local function check(path)
         local modifiedTime = files.modified(path)
         if not modifiedMap[path] then
-            if runInit then
-                callback(path, modifiedTime)
-            end
-        elseif modifiedTime - modifiedMap[path] > triggerDelay then
-            callback(path, modifiedTime)
+            callback(path, modifiedTime, true)
+            modifiedMap[path] = modifiedTime
+        elseif modifiedTime - modifiedMap[path] >= triggerDelay then
+            callback(path, modifiedTime, false)
+            modifiedMap[path] = modifiedTime
         end
-        modifiedMap[path] = modifiedTime
     end
-    timer.delay(0, function()
-        for i,v in ipairs(paths) do
-            check(v)
-        end
-        return checkDelay
-    end)
-    timer.start()
+    while true do
+        for i,v in ipairs(paths) do check(v) end
+    end
 end

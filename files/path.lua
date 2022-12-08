@@ -2,7 +2,7 @@
     Path
 ]]
 
-assert(Log == nil)
+assert(Path == nil)
 Path = class("Path")
 
 function Path:__init__(value)

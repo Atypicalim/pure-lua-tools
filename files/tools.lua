@@ -26,14 +26,16 @@ function tools.is_mac()
 end
 
 function tools.execute(cmd)
-    local path = string.format('./.lua.execute_%d.log', os.time())
-    files.delete(path)
-    local command = string.format('%s >> ./%s 2>&1', cmd, path)
-    local result, _ = os.execute(command)
-    local isOk = result == true or result == 0
-    local output = files.read(path)
-    files.delete(path)
-    return isOk, output
+    local flag = "::MY_ERROR_FLAG::"
+    local file = io.popen(cmd .. [[ 2>&1 || echo ]] .. flag, "r")
+    local out = file:read("*all"):trim()
+    local isOk = not out:find(flag)
+    if not isOk then
+        out = out:sub(1, #out - #flag)
+    end
+    file:close()
+    out = out:trim()
+    return isOk, out
 end
 
 function tools.get_timezone()

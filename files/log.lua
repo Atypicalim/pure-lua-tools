@@ -52,7 +52,6 @@ function Log:__init__(path, name, level, color)
         assert(self._file ~= nil, 'invalid log file!')
     end
     self._valid = true
-    tools.execute("cd")
     self:_write(Log.LEVEL.USER, "START->%s", self._name)
 end
 

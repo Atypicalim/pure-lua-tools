@@ -1,5 +1,5 @@
 
--- tools:[2022-11-24_01:30:59]
+-- tools:[2022-12-08_21:45:12]
 
 -- file:[./files/lua.lua]
 
@@ -110,14 +110,16 @@ end
 function string.prepend(this, other)
     return other .. this
 end
-function string.ltrim(this)
-    return string.gsub(this, "^[ \t\n\r]+", "")
+function string.ltrim(this, pattern)
+    pattern = pattern or " \t\n\r"
+    return string.gsub(this, "^[" .. pattern .. "]+", "")
 end
-function string.rtrim(this)
-    return string.gsub(this, "[ \t\n\r]+$", "")
+function string.rtrim(this, pattern)
+    pattern = pattern or " \t\n\r"
+    return string.gsub(this, "[" .. pattern .. "]+$", "")
 end
-function string.trim(this)
-    return this:ltrim():rtrim()
+function string.trim(this, pattern)
+    return this:ltrim(pattern):rtrim(pattern)
 end
 function string.slash(this)
     return this:gsub('\\', '/')
@@ -611,6 +613,153 @@ function json.decode(s)
     return nil, r
 end
 
+-- file:[./files/class.lua]
+
+local classMap = {}
+local function new(Class, ...)
+    assert(is_class(Class), "invalid class table")
+    local object = {
+        __type__ = "object",
+        __name__ = Class.__name__,
+        __class__ = Class
+    }
+    local objectMeta = {
+        __index = Class,
+        __tostring = function(object)
+            return string.format("<object %s>: %s", object.__name__, lua_get_pointer(object))
+        end
+    }
+    local object = setmetatable(object, objectMeta)
+    assert(object.__init__, string.format("not constructor for class: %s", object.__class__.__name__))
+    object.__init__(object, ...)
+    return object
+end
+assert(class == nil)
+function class(name, Base)
+    assert(is_string(name), "invalid class name")
+    assert(is_nil(Base) or is_class(Base), "invalid class base")
+    assert(is_nil(classMap[name]), "multiple class name")
+    local Class = {
+        __type__ = "class",
+        __name__ = name,
+        __super__ = Base
+    }
+    local ClassMeta = {
+        __tostring = function(Class)
+            return string.format("<Class %s>: %s", Class.__name__, lua_get_pointer(Class))
+        end,
+        __call = function(Class, ...)
+            return new(Class, ...)
+        end
+    }
+    if Class.__super__ then
+        ClassMeta.__index = Class.__super__
+    end
+    setmetatable(Class, ClassMeta)
+    return Class, Base
+end
+
+-- file:[./files/Path.lua]
+
+assert(Path == nil)
+Path = class("Path")
+function Path:__init__(value)
+    self._stack = {}
+    self:set(value)
+end
+function Path:set(value)
+    if value == "~" then
+        value = os.getenv('HOME') or os.getenv('USERPROFILE')
+    elseif value == "." then
+        local cwd = io.popen"cd":read'*l'
+        value = Path(cwd):get()
+    elseif value == "/" or value == "\\" then
+        local cwd = io.popen"cd":read'*l'
+        value = Path(cwd)._stack[1]
+    end
+    value = value or ""
+    value = value:gsub("\\+", "/"):gsub("/+", "/")
+    value = value:trim():trim("/"):trim()
+    self._stack = {}
+    local arr = string.explode(value, "/")
+    for i,v in ipairs(arr) do
+        table.insert(self._stack, v)
+    end
+    return self
+end
+function Path:get(isCalculate, delimiter)
+    isCalculate = isCalculate == true
+    delimiter = delimiter or string.find(os.tmpname(""), "\\") and "\\" or "/"
+    local stack = {}
+    local value = ""
+    for i,v in ipairs(self._stack) do
+        if isCalculate and v == ".." then
+            table.remove(stack, #stack)
+        elseif isCalculate and v == "." then
+            if #stack == 0 then
+                table.insert(stack, v)
+            end
+        else
+            table.insert(stack, v)
+        end
+    end
+    for i,v in ipairs(stack) do
+        value = i == 1 and v or value .. delimiter .. v
+    end
+    return value
+end
+function Path:push(...)
+    local values = {...}
+    local value = ""
+    for i,v in ipairs(values) do
+        value = value .. "/" .. v
+    end
+    return self:append(Path(value))
+end
+function Path:pop(depth)
+    depth = depth or 1
+    for i=1,depth do
+        table.remove(self._stack, #self._stack)
+    end
+    return self
+end
+function Path:equal(other)
+    assert(type(other) == "table")
+    return self:get() == other:get()
+end
+function Path:append(other)
+    assert(type(other) == "table")
+    for i,v in ipairs(other._stack) do
+        table.insert(self._stack, v)
+    end
+    return self
+end
+function Path:relative(other)
+    local value1 = self:get(true)
+    local value2 = other:get(true)
+    local stack1 = Path(value1)._stack
+    local stack2 = Path(value2)._stack
+    local diff = ""
+    for i=1,math.max(#stack1, #stack2) do
+        local v1 = stack1[i]
+        local v2 = stack2[i]
+        if v1 ~= nil and v2 ~= nil then
+            if v1 == v2 then
+            else
+                diff =   diff .. "/../" .. v2
+            end
+        elseif v1 and not v2 then
+            diff = ".." .. "/" .. diff
+        elseif not v1 and v2 then
+            diff =  diff .. "/" .. v2
+        end
+    end
+    return Path(diff)
+end
+function Path:root()
+    return self:pop(#self._stack - 1)
+end
+
 -- file:[./files/files.lua]
 
 files = files or {}
@@ -745,31 +894,16 @@ end
 function files.get_folder(filePath)
     return string.gsub(filePath, "[^\\/]+%.[^\\/]+", "")
 end
-function files.modified(path, isDebug)
+function files.modified(path)
     local stamp = nil
     xpcall(function()
         local isOk, result = tools.execute("stat -f %m " .. path) -- mac
-        if isOk then
-            stamp = result
-        end
+        if isOk then stamp = result end
+        local isOk, result = tools.execute("stat -c %Y " .. path) -- linux
+        if isOk then stamp = result end
+        assert(stamp ~= nil, 'get modified stamp failed')
     end, function(err)
-        if isDebug then
-            print(err)
-        end
-    end)
-    xpcall(function()
-        local isOk, result = tools.execute([[forfiles /M ]] .. path .. [[ /C "cmd /c echo @fdate_@ftime"]]) -- windows
-        if isOk then
-            result = string.trim(result or "")
-        end
-        local year, month, day, hour, minute, second = string.match(result, "(%d+)%/(%d+)%/(%d+)_(%d+):(%d+):(%d+)")
-        if year then
-            stamp = os.time({year = year, month = month, day = day, hour = hour, min = minute, sec = second})
-        end
-    end, function(err)
-        if isDebug then
-            print(err)
-        end
+        print(err)
     end)
     if not stamp then
         return -1
@@ -777,37 +911,28 @@ function files.modified(path, isDebug)
     local modified = tonumber(stamp) or -1
     return modified
 end
-function files.watch(paths, callback, runInit, triggerDelay, checkDelay)
+function files.watch(paths, callback, triggerDelay)
     if is_string(paths) then paths = {paths} end
     assert(#paths >= 1, 'the paths to watch should not be empty')
     assert(is_function(callback), 'the last argument should be a callback func')
     for i, path in ipairs(paths) do
         assert(files.is_file(path) or files.is_folder(path), 'path not found in watch:' .. tostring(path))
     end
-    if not is_boolean(runInit) then
-        runInit = true
-    end
-    checkDelay = checkDelay or 1
     triggerDelay = triggerDelay or 1
     local modifiedMap = {}
     local function check(path)
         local modifiedTime = files.modified(path)
         if not modifiedMap[path] then
-            if runInit then
-                callback(path, modifiedTime)
-            end
-        elseif modifiedTime - modifiedMap[path] > triggerDelay then
-            callback(path, modifiedTime)
+            callback(path, modifiedTime, true)
+            modifiedMap[path] = modifiedTime
+        elseif modifiedTime - modifiedMap[path] >= triggerDelay then
+            callback(path, modifiedTime, false)
+            modifiedMap[path] = modifiedTime
         end
-        modifiedMap[path] = modifiedTime
     end
-    timer.delay(0, function()
-        for i,v in ipairs(paths) do
-            check(v)
-        end
-        return checkDelay
-    end)
-    timer.start()
+    while true do
+        for i,v in ipairs(paths) do check(v) end
+    end
 end
 
 -- file:[./files/bit.lua]
@@ -1198,8 +1323,8 @@ function http.download(url, path, tp)
         cmd = [[wget "%s" -O "%s"]]
     end
     cmd = string.format(cmd, url, path)
-    local isOk, output, code = tools.execute(cmd)
-    return isOk, output, code, cmd
+    local isOk, output = tools.execute(cmd)
+    return isOk, output, cmd
 end
 local function curl_request(url, method, params, headers)
     local httpContentFile = "./.lua.http.log"
@@ -1321,14 +1446,16 @@ function tools.is_mac()
     return isLinux
 end
 function tools.execute(cmd)
-    local path = string.format('./.lua.execute_%d.log', os.time())
-    files.delete(path)
-    local command = string.format('%s >> ./%s 2>&1', cmd, path)
-    local result, _ = os.execute(command)
-    local isOk = result == true or result == 0
-    local output = files.read(path)
-    files.delete(path)
-    return isOk, output
+    local flag = "::MY_ERROR_FLAG::"
+    local file = io.popen(cmd .. [[ 2>&1 || echo ]] .. flag, "r")
+    local out = file:read("*all"):trim()
+    local isOk = not out:find(flag)
+    if not isOk then
+        out = out:sub(1, #out - #flag)
+    end
+    file:close()
+    out = out:trim()
+    return isOk, out
 end
 function tools.get_timezone()
     local now = os.time()
@@ -1341,52 +1468,6 @@ function tools.get_milliseconds()
     local clock = os.clock()
     local _, milli = math.modf(clock)
     return math.floor(os.time() * 1000 + milli * 1000)
-end
-
--- file:[./files/class.lua]
-
-local classMap = {}
-local function new(Class, ...)
-    assert(is_class(Class), "invalid class table")
-    local object = {
-        __type__ = "object",
-        __name__ = Class.__name__,
-        __class__ = Class
-    }
-    local objectMeta = {
-        __index = Class,
-        __tostring = function(object)
-            return string.format("<object %s>: %s", object.__name__, lua_get_pointer(object))
-        end
-    }
-    local object = setmetatable(object, objectMeta)
-    assert(object.__init__, string.format("not constructor for class: %s", object.__class__.__name__))
-    object.__init__(object, ...)
-    return object
-end
-assert(class == nil)
-function class(name, Base)
-    assert(is_string(name), "invalid class name")
-    assert(is_nil(Base) or is_class(Base), "invalid class base")
-    assert(is_nil(classMap[name]), "multiple class name")
-    local Class = {
-        __type__ = "class",
-        __name__ = name,
-        __super__ = Base
-    }
-    local ClassMeta = {
-        __tostring = function(Class)
-            return string.format("<Class %s>: %s", Class.__name__, lua_get_pointer(Class))
-        end,
-        __call = function(Class, ...)
-            return new(Class, ...)
-        end
-    }
-    if Class.__super__ then
-        ClassMeta.__index = Class.__super__
-    end
-    setmetatable(Class, ClassMeta)
-    return Class, Base
 end
 
 -- file:[./files/Object.lua]
@@ -1607,7 +1688,6 @@ function Log:__init__(path, name, level, color)
         assert(self._file ~= nil, 'invalid log file!')
     end
     self._valid = true
-    tools.execute("cd")
     self:_write(Log.LEVEL.USER, "START->%s", self._name)
 end
 function Log:close()
@@ -2016,53 +2096,53 @@ end
 function dialog.select_file(title, filter, folder)
     title = title or "please select a file ..."
     filter = filter or "All files (*.*)|*.*"
-	folder = folder or ""
+    folder = folder or ""
     print(dialog_validate_folder(folder))
-	local path = dialog_execute_powershell("select_file", title, filter, dialog_validate_folder(folder))
-	if string.valid(path) then
-		return path
-	end
+    local path = dialog_execute_powershell("select_file", title, filter, dialog_validate_folder(folder))
+    if string.valid(path) then
+        return path
+    end
 end
 function dialog.select_folder(title, folder)
     title = title or "please select a folder ..."
-	folder = folder or ""
-	local path = dialog_execute_powershell("select_folder", title, dialog_validate_folder(folder))
-	if string.valid(path) then
-		return path
-	end
+    folder = folder or ""
+    local path = dialog_execute_powershell("select_folder", title, dialog_validate_folder(folder))
+    if string.valid(path) then
+        return path
+    end
 end
 function dialog.select_save(title, filter, folder)
     title = title or "please save a file ..."
     filter = filter or "All files (*.*)|*.*"
-	folder = folder or ""
-	local path = dialog_execute_powershell("select_save", title, filter, dialog_validate_folder(folder))
-	if string.valid(path) then
-		return path
-	end
+    folder = folder or ""
+    local path = dialog_execute_powershell("select_save", title, filter, dialog_validate_folder(folder))
+    if string.valid(path) then
+        return path
+    end
 end
 function dialog.select_color()
-	local color = dialog_execute_powershell("select_color")
-	if string.valid(color) then
+    local color = dialog_execute_powershell("select_color")
+    if string.valid(color) then
         local t = string.explode(color, ",")
         local r, g, b = tonumber(t[1]), tonumber(t[2]), tonumber(t[3])
         return r, g, b
-	end
+    end
 end
 function dialog.show_confirm(title, message, flag)
-	title = title or "title..."
-	message = message or "confirm..."
+    title = title or "title..."
+    message = message or "confirm..."
     flag = flag or "YesNoCancel" -- YesNoCancel, YesNo, OkCancel, OKOnly, Critical, Question, Exclamation, Information
-	local r = dialog_execute_powershell("show_confirm", title, message, flag)
+    local r = dialog_execute_powershell("show_confirm", title, message, flag)
     if r == "Yes" or r == "Ok" then return true end
     if r == "No" then return false end
     return nil
 end
 function dialog.show_input(title, message, default)
-	title = title or "title..."
-	message = message or "input..."
-	default = default or ""
-	local result = dialog_execute_powershell("show_input", title, message, default)
-	if string.valid(result) then
-		return result
-	end
+    title = title or "title..."
+    message = message or "input..."
+    default = default or ""
+    local result = dialog_execute_powershell("show_input", title, message, default)
+    if string.valid(result) then
+        return result
+    end
 end

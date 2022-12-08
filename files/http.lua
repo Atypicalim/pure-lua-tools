@@ -18,8 +18,8 @@ function http.download(url, path, tp)
         cmd = [[wget "%s" -O "%s"]]
     end
     cmd = string.format(cmd, url, path)
-    local isOk, output, code = tools.execute(cmd)
-    return isOk, output, code, cmd
+    local isOk, output = tools.execute(cmd)
+    return isOk, output, cmd
 end
 
 local function curl_request(url, method, params, headers)
