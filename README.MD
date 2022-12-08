@@ -331,6 +331,17 @@ print(Path("~"):relative(path):get())
 -- ..\xyz\abc
 ```
 
+17. Time
+
+```lua
+local time = Time(os.time())
+print(time:getYear())
+-- 2022
+local time = Time(60 * 60 * 24 * 10 + 60 * 60 * 5 + 60 * 7 + 9)
+print(time:countDay())
+-- 1 3 5 7 9
+```
+
 ![log_test](./others/test_dialog.png)
 
 ---

@@ -18,6 +18,7 @@ local orders = {
     "files",
     "bit",
     "encryption",
+    "time",
     "timer",
     "http",
     "package",

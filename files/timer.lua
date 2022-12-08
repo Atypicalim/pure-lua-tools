@@ -1,5 +1,5 @@
 --[[
-    string
+    timer
 ]]
 
 timer = timer or {}
