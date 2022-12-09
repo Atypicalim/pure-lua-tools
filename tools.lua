@@ -1,5 +1,5 @@
 
--- tools:[2022-12-09_19:37:31]
+-- tools:[2022-12-10_02:39:59]
 
 -- file:[./files/lua.lua]
 
@@ -769,9 +769,6 @@ function files.delimiter()
     delimiter = string.find(os.tmpname(""), "\\") and "\\" or "/"
     return delimiter
 end
-function files.home()
-    return os.getenv('HOME') or os.getenv('USERPROFILE')
-end
 local cwd = nil
 function files.cwd()
     if cwd then return cwd end
@@ -1240,39 +1237,31 @@ local SECONDS_DAY = 60 * 60 * 24
 local SECONDS_HOUR = 60 * 60
 local SECONDS_MINUTE = 60
 local SECONDS_SECOND = 1
-function Time:__init__(time, zone)
-    self._time = time or os.time()
-    self._zone = zone
-    if not self._zone then
-        local now = os.time()
-        local utc = os.time(os.date("!*t", now))
-        local diff = os.difftime(now, utc)
-        self._zone = math.floor(diff / SECONDS_HOUR)
-    end
+function Time.getZone()
+    local now = os.time()
+    local utc = os.time(os.date("!*t", now))
+    local diff = os.difftime(now, utc)
+    local zone = math.floor(diff / 60 / 60)
+    return zone
 end
-function Time:getValue()
+function Time:getMillis()
+    local _, milli = math.modf(os.clock())
+    return math.floor(Time.getSeconds() * 1000 + milli * 1000)
+end
+function Time:__init__(time)
+    self._time = time or os.time()
+end
+function Time:value()
     return self._time
 end
-function Time:getDate(desc)
-    return os.date(desc or "%Y-%m-%d_%H:%M:%S", self._time)
+function Time:format(desc)
+    return os.date(desc, self._time)
 end
 function Time:getTime()
-    return self._time
+    return os.date("%H%M%S", self._time)
 end
-function Time:setTime(time)
-    assert(time ~= nil)
-    self._time = time
-    return self
-end
-function Time:getZone()
-    return self._zone
-end
-function Time:setZone(zone)
-    assert(zone ~= nil)
-    self._time = self._time - self._zone * SECONDS_HOUR
-    self._zone = zone
-    self._time = self._time + self._zone * SECONDS_HOUR
-    return self
+function Time:getDate()
+    return os.date("%Y%m%d", self._time)
 end
 function Time:getYear()
     return tonumber(os.date("%Y", self._time))
@@ -1286,9 +1275,6 @@ end
 function Time:getDay()
     return tonumber(os.date("%d", self._time))
 end
-function Time:getYMD()
-    return self:getYear(), self:getMonth(), self:getDay()
-end
 function Time:getHour()
     return tonumber(os.date("%H", self._time))
 end
@@ -1297,9 +1283,6 @@ function Time:getMinute()
 end
 function Time:getSecond()
     return tonumber(os.date("%S", self._time))
-end
-function Time:getHMS()
-    return self:getHour(), self:getMinute(), self:getSecond()
 end
 function Time:getWeek()
     local w = tonumber(os.date("%w", self._time))
@@ -1311,30 +1294,8 @@ end
 function Time:isAm()
     return self:getHour() < 12
 end
-function Time:isLeap()
-    local year = self:getYear()
-    if year % 4 == 0 and year % 100 ~= 0 then
-        return true
-    end
-    if year % 400 == 0 then
-        return true
-    end
-    return false
-end
-function Time:isSameWeek(time)
-    return self:countWeek() == time:countWeek()
-end
-function Time:isSameDay(time)
-    return self:countDay() == time:countDay()
-end
-function Time:isSameHour(time)
-    return self:countHour() == time:countHour()
-end
-function Time:isSameMinute(time)
-    return self:countMinute() == time:countMinute()
-end
-function Time:getYMDHMS()
-    return self:getYear(), self:getMonth(), self:getDay(), self:getHour(), self:getMinute(), self:getSecond()
+function Time:isPm()
+    return not self:isAm()
 end
 function Time:countWeek()
     local second = self._time % SECONDS_WEEK
@@ -1365,39 +1326,33 @@ function Time:countMinute()
     local minute = (self._time - second) / SECONDS_MINUTE
     return minute, second
 end
-function Time:addWeek(count)
-    assert(count ~= nil)
-    self._time = self._time + count * SECONDS_WEEK
+function Time:addWeek(cound)
+    self._time = self._time + cound * SECONDS_WEEK
     return self
 end
-function Time:addDay(count)
-    assert(count ~= nil)
-    self._time = self._time + count * SECONDS_DAY
+function Time:addDay(cound)
+    self._time = self._time + cound * SECONDS_DAY
     return self
 end
-function Time:addHour(count)
-    assert(count ~= nil)
-    self._time = self._time + count * SECONDS_HOUR
+function Time:addHour(cound)
+    self._time = self._time + cound * SECONDS_HOUR
     return self
 end
-function Time:addMinute(count)
-    assert(count ~= nil)
-    self._time = self._time + count * SECONDS_MINUTE
+function Time:addMinute(cound)
+    self._time = self._time + cound * SECONDS_MINUTE
     return self
 end
-function Time:addSecond(count)
-    assert(count ~= nil)
-    self._time = self._time + count * SECONDS_SECOND
+function Time:addSecond(cound)
+    self._time = self._time + cound * SECONDS_SECOND
     return self
 end
 function Time:diffTime(time)
-    assert(time ~= nil)
-    local distance = self:getValue() - time:getValue()
+    assert(type(time) == "table", 'invalid  time value')
+    local distance = self:value() - time:value()
     return Time(math.abs(distance)), distance > 0
 end
 function Time:addTime(time)
-    assert(time ~= nil)
-    self._time = self._time + time:getValue()
+    self._time = self._time + time:value()
     return self
 end
 
@@ -1629,18 +1584,6 @@ function tools.execute(cmd)
     file:close()
     out = out:trim()
     return isOk, out
-end
-function tools.get_timezone()
-    local now = os.time()
-    local utc = os.time(os.date("!*t", now))
-    local diff = os.difftime(now, utc)
-    local zone = math.floor(diff / 60 / 60)
-    return zone
-end
-function tools.get_milliseconds()
-    local clock = os.clock()
-    local _, milli = math.modf(clock)
-    return math.floor(os.time() * 1000 + milli * 1000)
 end
 
 -- file:[./files/Object.lua]
@@ -2319,3 +2262,1140 @@ function dialog.show_input(title, message, default)
         return result
     end
 end
+
+-- file:[./files/libs/log30.lua]
+
+function log30_wrapper()
+local class
+local assert, pairs, type, tostring, baseMt, _instances, _classes, class = assert, pairs, type, tostring, {}, {}, {}
+local function deep_copy(t, dest, aType)
+  local t, r = t or {}, dest or {}
+  for k,v in pairs(t) do
+    if aType and type(v)==aType then r[k] = v elseif not aType then
+      if type(v) == 'table' and k ~= "__index" then r[k] = deep_copy(v) else r[k] = v end
+    end
+  end; return r
+end
+local function instantiate(self,...)
+  local instance = deep_copy(self) ; _instances[instance] = tostring(instance); setmetatable(instance,self)
+  if self.__init then
+    if type(self.__init) == 'table' then deep_copy(self.__init, instance) else self.__init(instance, ...) end
+  end
+  return instance
+end
+local function extends(self,extra_params)
+  local heirClass = deep_copy(self, class(extra_params)); heirClass.__index, heirClass.super = heirClass, self
+  return setmetatable(heirClass,self)
+end
+local baseMt = { __call = function (self,...) return self:new(...) end,
+   __tostring = function(self,...)
+    if _instances[self] then return ('object (of %s): <%s>'):format((rawget(getmetatable(self),'__name') or 'Unnamed'), _instances[self]) end
+    return _classes[self] and ('class (%s): <%s>'):format((rawget(self,'__name') or 'Unnamed'),_classes[self]) or self
+  end}
+class = function(attr)
+  local c = deep_copy(attr) ; _classes[c] = tostring(c);
+  c.with = function(self,include) assert(_classes[self], 'Mixins can only be used on classes') return deep_copy(include, self, 'function') end
+  c.new, c.extends, c.__index, c.__call, c.__tostring = instantiate, extends, c, baseMt.__call, baseMt.__tostring; return setmetatable(c,baseMt)
+end;
+return class
+end
+
+-- file:[./files/libs/deflate.lua]
+
+function deflate_wrapper()
+local M = {_TYPE='module', _NAME='compress.deflatelua', _VERSION='0.3.20111128'}
+local assert = assert
+local error = error
+local ipairs = ipairs
+local pairs = pairs
+local print = print
+local require = require
+local tostring = tostring
+local type = type
+local setmetatable = setmetatable
+local io = io
+local math = math
+local table_sort = table.sort
+local math_max = math.max
+local string_char = string.char
+local function requireany(...)
+  local errs = {}
+  for i = 1, select('#', ...) do local name = select(i, ...)
+    if type(name) ~= 'string' then return name, '' end
+    local ok, mod = pcall(require, name)
+    if ok then return mod, name end
+    errs[#errs+1] = mod
+  end
+  error(table.concat(errs, '\n'), 2)
+end
+local bit, name_ = requireany('bit', 'bit32', 'bit.numberlua', nil)
+local DEBUG = false
+local NATIVE_BITOPS = (bit ~= nil)
+local band, lshift, rshift
+if NATIVE_BITOPS then
+  band = bit.band
+  lshift = bit.lshift
+  rshift = bit.rshift
+end
+local function warn(s)
+  io.stderr:write(s, '\n')
+end
+local function debug(...)
+  print('DEBUG', ...)
+end
+local function runtime_error(s, level)
+  level = level or 1
+  error({s}, level+1)
+end
+local function make_outstate(outbs)
+  local outstate = {}
+  outstate.outbs = outbs
+  outstate.window = {}
+  outstate.window_pos = 1
+  return outstate
+end
+local function output(outstate, byte)
+  local window_pos = outstate.window_pos
+  outstate.outbs(byte)
+  outstate.window[window_pos] = byte
+  outstate.window_pos = window_pos % 32768 + 1 -- 32K
+end
+local function noeof(val)
+  return assert(val, 'unexpected end of file')
+end
+local function hasbit(bits, bit)
+  return bits % (bit + bit) >= bit
+end
+local function memoize(f)
+  local mt = {}
+  local t = setmetatable({}, mt)
+  function mt:__index(k)
+    local v = f(k)
+    t[k] = v
+    return v
+  end
+  return t
+end
+local pow2 = memoize(function(n) return 2^n end)
+local is_bitstream = setmetatable({}, {__mode='k'})
+local function bytestream_from_file(fh)
+  local o = {}
+  function o:read()
+    local sb = fh:read(1)
+    if sb then return sb:byte() end
+  end
+  return o
+end
+local function bytestream_from_string(s)
+  local i = 1
+  local o = {}
+  function o:read()
+    local by
+    if i <= #s then
+      by = s:byte(i)
+      i = i + 1
+    end
+    return by
+  end
+  return o
+end
+local function bytestream_from_function(f)
+  local i = 0
+  local buffer = ''
+  local o = {}
+  function o:read()
+    i = i + 1
+    if i > #buffer then
+      buffer = f()
+      if not buffer then return end
+      i = 1
+    end
+    return buffer:byte(i,i)
+  end
+  return o
+end
+local function bitstream_from_bytestream(bys)
+  local buf_byte = 0
+  local buf_nbit = 0
+  local o = {}
+  function o:nbits_left_in_byte()
+    return buf_nbit
+  end
+  if NATIVE_BITOPS then
+    function o:read(nbits)
+      nbits = nbits or 1
+      while buf_nbit < nbits do
+        local byte = bys:read()
+        if not byte then return end -- note: more calls also return nil
+        buf_byte = buf_byte + lshift(byte, buf_nbit)
+        buf_nbit = buf_nbit + 8
+      end
+      local bits
+      if nbits == 0 then
+        bits = 0
+      elseif nbits == 32 then
+        bits = buf_byte
+        buf_byte = 0
+      else
+        bits = band(buf_byte, rshift(0xffffffff, 32 - nbits))
+        buf_byte = rshift(buf_byte, nbits)
+      end
+      buf_nbit = buf_nbit - nbits
+      return bits
+    end
+  else
+    function o:read(nbits)
+      nbits = nbits or 1
+      while buf_nbit < nbits do
+        local byte = bys:read()
+        if not byte then return end -- note: more calls also return nil
+        buf_byte = buf_byte + pow2[buf_nbit] * byte
+        buf_nbit = buf_nbit + 8
+      end
+      local m = pow2[nbits]
+      local bits = buf_byte % m
+      buf_byte = (buf_byte - bits) / m
+      buf_nbit = buf_nbit - nbits
+      return bits
+    end
+  end
+  is_bitstream[o] = true
+  return o
+end
+local function get_bitstream(o)
+  local bs
+  if is_bitstream[o] then
+    return o
+  elseif io.type(o) == 'file' then
+    bs = bitstream_from_bytestream(bytestream_from_file(o))
+  elseif type(o) == 'string' then
+    bs = bitstream_from_bytestream(bytestream_from_string(o))
+  elseif type(o) == 'function' then
+    bs = bitstream_from_bytestream(bytestream_from_function(o))
+  else
+    runtime_error 'unrecognized type'
+  end
+  return bs
+end
+local function get_obytestream(o)
+  local bs
+  if io.type(o) == 'file' then
+    bs = function(sbyte) o:write(string_char(sbyte)) end
+  elseif type(o) == 'function' then
+    bs = o
+  else
+    runtime_error('unrecognized type: ' .. tostring(o))
+  end
+  return bs
+end
+local function HuffmanTable(init, is_full)
+  local t = {}
+  if is_full then
+    for val,nbits in pairs(init) do
+      if nbits ~= 0 then
+        t[#t+1] = {val=val, nbits=nbits}
+      end
+    end
+  else
+    for i=1,#init-2,2 do
+      local firstval, nbits, nextval = init[i], init[i+1], init[i+2]
+      if nbits ~= 0 then
+        for val=firstval,nextval-1 do
+          t[#t+1] = {val=val, nbits=nbits}
+        end
+      end
+    end
+  end
+  table_sort(t, function(a,b)
+    return a.nbits == b.nbits and a.val < b.val or a.nbits < b.nbits
+  end)
+  local code = 1 -- leading 1 marker
+  local nbits = 0
+  for i,s in ipairs(t) do
+    if s.nbits ~= nbits then
+      code = code * pow2[s.nbits - nbits]
+      nbits = s.nbits
+    end
+    s.code = code
+    code = code + 1
+  end
+  local minbits = math.huge
+  local look = {}
+  for i,s in ipairs(t) do
+    minbits = math.min(minbits, s.nbits)
+    look[s.code] = s.val
+  end
+  local msb = NATIVE_BITOPS and function(bits, nbits)
+    local res = 0
+    for i=1,nbits do
+      res = lshift(res, 1) + band(bits, 1)
+      bits = rshift(bits, 1)
+    end
+    return res
+  end or function(bits, nbits)
+    local res = 0
+    for i=1,nbits do
+      local b = bits % 2
+      bits = (bits - b) / 2
+      res = res * 2 + b
+    end
+    return res
+  end
+  local tfirstcode = memoize(
+    function(bits) return pow2[minbits] + msb(bits, minbits) end)
+  function t:read(bs)
+    local code = 1 -- leading 1 marker
+    local nbits = 0
+    while 1 do
+      if nbits == 0 then -- small optimization (optional)
+        code = tfirstcode[noeof(bs:read(minbits))]
+        nbits = nbits + minbits
+      else
+        local b = noeof(bs:read())
+        nbits = nbits + 1
+        code = code * 2 + b -- MSB first
+      end
+      local val = look[code]
+      if val then
+        return val
+      end
+    end
+  end
+  return t
+end
+local function parse_gzip_header(bs)
+  local FLG_FHCRC = 2^1
+  local FLG_FEXTRA = 2^2
+  local FLG_FNAME = 2^3
+  local FLG_FCOMMENT = 2^4
+  local id1 = bs:read(8)
+  local id2 = bs:read(8)
+  if id1 ~= 31 or id2 ~= 139 then
+    runtime_error 'not in gzip format'
+  end
+  local cm = bs:read(8) -- compression method
+  local flg = bs:read(8) -- FLaGs
+  local mtime = bs:read(32) -- Modification TIME
+  local xfl = bs:read(8) -- eXtra FLags
+  local os = bs:read(8) -- Operating System
+  if DEBUG then
+    debug("CM=", cm)
+    debug("FLG=", flg)
+    debug("MTIME=", mtime)
+    debug("XFL=", xfl)
+    debug("OS=", os)
+  end
+  if not os then runtime_error 'invalid header' end
+  if hasbit(flg, FLG_FEXTRA) then
+    local xlen = bs:read(16)
+    local extra = 0
+    for i=1,xlen do
+      extra = bs:read(8)
+    end
+    if not extra then runtime_error 'invalid header' end
+  end
+  local function parse_zstring(bs)
+    repeat
+      local by = bs:read(8)
+      if not by then runtime_error 'invalid header' end
+    until by == 0
+  end
+  if hasbit(flg, FLG_FNAME) then
+    parse_zstring(bs)
+  end
+  if hasbit(flg, FLG_FCOMMENT) then
+    parse_zstring(bs)
+  end
+  if hasbit(flg, FLG_FHCRC) then
+    local crc16 = bs:read(16)
+    if not crc16 then runtime_error 'invalid header' end
+    if DEBUG then
+      debug("CRC16=", crc16)
+    end
+  end
+end
+local function parse_zlib_header(bs)
+  local cm = bs:read(4) -- Compression Method
+  local cinfo = bs:read(4) -- Compression info
+  local fcheck = bs:read(5) -- FLaGs: FCHECK (check bits for CMF and FLG)
+  local fdict = bs:read(1) -- FLaGs: FDICT (present dictionary)
+  local flevel = bs:read(2) -- FLaGs: FLEVEL (compression level)
+  local cmf = cinfo * 16 + cm -- CMF (Compresion Method and flags)
+  local flg = fcheck + fdict * 32 + flevel * 64 -- FLaGs
+  if cm ~= 8 then -- not "deflate"
+    runtime_error("unrecognized zlib compression method: " .. cm)
+  end
+  if cinfo > 7 then
+    runtime_error("invalid zlib window size: cinfo=" .. cinfo)
+  end
+  local window_size = 2^(cinfo + 8)
+  if (cmf*256 + flg) % 31 ~= 0 then
+    runtime_error("invalid zlib header (bad fcheck sum)")
+  end
+  if fdict == 1 then
+    runtime_error("FIX:TODO - FDICT not currently implemented")
+    local dictid_ = bs:read(32)
+  end
+  return window_size
+end
+local function parse_huffmantables(bs)
+    local hlit = bs:read(5) -- # of literal/length codes - 257
+    local hdist = bs:read(5) -- # of distance codes - 1
+    local hclen = noeof(bs:read(4)) -- # of code length codes - 4
+    local ncodelen_codes = hclen + 4
+    local codelen_init = {}
+    local codelen_vals = {
+      16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15}
+    for i=1,ncodelen_codes do
+      local nbits = bs:read(3)
+      local val = codelen_vals[i]
+      codelen_init[val] = nbits
+    end
+    local codelentable = HuffmanTable(codelen_init, true)
+    local function decode(ncodes)
+      local init = {}
+      local nbits
+      local val = 0
+      while val < ncodes do
+        local codelen = codelentable:read(bs)
+        local nrepeat
+        if codelen <= 15 then
+          nrepeat = 1
+          nbits = codelen
+        elseif codelen == 16 then
+          nrepeat = 3 + noeof(bs:read(2))
+        elseif codelen == 17 then
+          nrepeat = 3 + noeof(bs:read(3))
+          nbits = 0
+        elseif codelen == 18 then
+          nrepeat = 11 + noeof(bs:read(7))
+          nbits = 0
+        else
+          error 'ASSERT'
+        end
+        for i=1,nrepeat do
+          init[val] = nbits
+          val = val + 1
+        end
+      end
+      local huffmantable = HuffmanTable(init, true)
+      return huffmantable
+    end
+    local nlit_codes = hlit + 257
+    local ndist_codes = hdist + 1
+    local littable = decode(nlit_codes)
+    local disttable = decode(ndist_codes)
+    return littable, disttable
+end
+local tdecode_len_base
+local tdecode_len_nextrabits
+local tdecode_dist_base
+local tdecode_dist_nextrabits
+local function parse_compressed_item(bs, outstate, littable, disttable)
+  local val = littable:read(bs)
+  if val < 256 then -- literal
+    output(outstate, val)
+  elseif val == 256 then -- end of block
+    return true
+  else
+    if not tdecode_len_base then
+      local t = {[257]=3}
+      local skip = 1
+      for i=258,285,4 do
+        for j=i,i+3 do t[j] = t[j-1] + skip end
+        if i ~= 258 then skip = skip * 2 end
+      end
+      t[285] = 258
+      tdecode_len_base = t
+    end
+    if not tdecode_len_nextrabits then
+      local t = {}
+      if NATIVE_BITOPS then
+        for i=257,285 do
+          local j = math_max(i - 261, 0)
+          t[i] = rshift(j, 2)
+        end
+      else
+        for i=257,285 do
+          local j = math_max(i - 261, 0)
+          t[i] = (j - (j % 4)) / 4
+        end
+      end
+      t[285] = 0
+      tdecode_len_nextrabits = t
+    end
+    local len_base = tdecode_len_base[val]
+    local nextrabits = tdecode_len_nextrabits[val]
+    local extrabits = bs:read(nextrabits)
+    local len = len_base + extrabits
+    if not tdecode_dist_base then
+      local t = {[0]=1}
+      local skip = 1
+      for i=1,29,2 do
+        for j=i,i+1 do t[j] = t[j-1] + skip end
+        if i ~= 1 then skip = skip * 2 end
+      end
+      tdecode_dist_base = t
+    end
+    if not tdecode_dist_nextrabits then
+      local t = {}
+      if NATIVE_BITOPS then
+        for i=0,29 do
+          local j = math_max(i - 2, 0)
+          t[i] = rshift(j, 1)
+        end
+      else
+        for i=0,29 do
+          local j = math_max(i - 2, 0)
+          t[i] = (j - (j % 2)) / 2
+        end
+      end
+      tdecode_dist_nextrabits = t
+    end
+    local dist_val = disttable:read(bs)
+    local dist_base = tdecode_dist_base[dist_val]
+    local dist_nextrabits = tdecode_dist_nextrabits[dist_val]
+    local dist_extrabits = bs:read(dist_nextrabits)
+    local dist = dist_base + dist_extrabits
+    for i=1,len do
+      local pos = (outstate.window_pos - 1 - dist) % 32768 + 1 -- 32K
+      output(outstate, assert(outstate.window[pos], 'invalid distance'))
+    end
+  end
+  return false
+end
+local function parse_block(bs, outstate)
+  local bfinal = bs:read(1)
+  local btype = bs:read(2)
+  local BTYPE_NO_COMPRESSION = 0
+  local BTYPE_FIXED_HUFFMAN = 1
+  local BTYPE_DYNAMIC_HUFFMAN = 2
+  local BTYPE_RESERVED_ = 3
+  if DEBUG then
+    debug('bfinal=', bfinal)
+    debug('btype=', btype)
+  end
+  if btype == BTYPE_NO_COMPRESSION then
+    bs:read(bs:nbits_left_in_byte())
+    local len = bs:read(16)
+    local nlen_ = noeof(bs:read(16))
+    for i=1,len do
+      local by = noeof(bs:read(8))
+      output(outstate, by)
+    end
+  elseif btype == BTYPE_FIXED_HUFFMAN or btype == BTYPE_DYNAMIC_HUFFMAN then
+    local littable, disttable
+    if btype == BTYPE_DYNAMIC_HUFFMAN then
+      littable, disttable = parse_huffmantables(bs)
+    else
+      littable = HuffmanTable {0,8, 144,9, 256,7, 280,8, 288,nil}
+      disttable = HuffmanTable {0,5, 32,nil}
+    end
+    repeat
+      local is_done = parse_compressed_item(
+        bs, outstate, littable, disttable)
+    until is_done
+  else
+    runtime_error 'unrecognized compression type'
+  end
+  return bfinal ~= 0
+end
+function M.inflate(t)
+  local bs = get_bitstream(t.input)
+  local outbs = get_obytestream(t.output)
+  local outstate = make_outstate(outbs)
+  repeat
+    local is_final = parse_block(bs, outstate)
+  until is_final
+end
+local inflate = M.inflate
+function M.gunzip(t)
+  local bs = get_bitstream(t.input)
+  local outbs = get_obytestream(t.output)
+  local disable_crc = t.disable_crc
+  if disable_crc == nil then disable_crc = false end
+  parse_gzip_header(bs)
+  local data_crc32 = 0
+  inflate{input=bs, output=
+    disable_crc and outbs or
+      function(byte)
+        data_crc32 = crc32(byte, data_crc32)
+        outbs(byte)
+      end
+  }
+  bs:read(bs:nbits_left_in_byte())
+  local expected_crc32 = bs:read(32)
+  local isize = bs:read(32) -- ignored
+  if DEBUG then
+    debug('crc32=', expected_crc32)
+    debug('isize=', isize)
+  end
+  if not disable_crc and data_crc32 then
+    if data_crc32 ~= expected_crc32 then
+      runtime_error('invalid compressed data--crc error')
+    end
+  end
+  if bs:read() then
+    warn 'trailing garbage ignored'
+  end
+end
+function M.adler32(byte, crc)
+  local s1 = crc % 65536
+  local s2 = (crc - s1) / 65536
+  s1 = (s1 + byte) % 65521
+  s2 = (s2 + s1) % 65521
+  return s2*65536 + s1
+end -- 65521 is the largest prime smaller than 2^16
+function M.inflate_zlib(t)
+  local bs = get_bitstream(t.input)
+  local outbs = get_obytestream(t.output)
+  local disable_crc = t.disable_crc
+  if disable_crc == nil then disable_crc = false end
+  local window_size_ = parse_zlib_header(bs)
+  local data_adler32 = 1
+  inflate{input=bs, output=
+    disable_crc and outbs or
+      function(byte)
+        data_adler32 = M.adler32(byte, data_adler32)
+        outbs(byte)
+      end
+  }
+  bs:read(bs:nbits_left_in_byte())
+  local b3 = bs:read(8)
+  local b2 = bs:read(8)
+  local b1 = bs:read(8)
+  local b0 = bs:read(8)
+  local expected_adler32 = ((b3*256 + b2)*256 + b1)*256 + b0
+  if DEBUG then
+    debug('alder32=', expected_adler32)
+  end
+  if not disable_crc then
+    if data_adler32 ~= expected_adler32 then
+      runtime_error('invalid compressed data--crc error')
+    end
+  end
+  if bs:read() then
+    warn 'trailing garbage ignored'
+  end
+end
+return M
+end
+
+-- file:[./files/libs/stream.lua]
+
+function stream_wrapper()
+class = library and library.log30 or log30_wrapper()
+local Stream = class()
+Stream.data = {}
+Stream.position = 1
+Stream.__name = "Stream"
+function Stream:__init(param)
+    local str = ""	
+    if (param.inputF ~= nil) then
+	str = io.open(param.inputF, "rb"):read("*all")
+    end
+    if (param.input ~= nil) then
+	str = param.input
+    end
+    for i=1,#str do
+	self.data[i] = str:byte(i, i)
+    end
+end
+function Stream:bsRight(num, pow)
+    return math.floor(num / 2^pow)
+end
+function Stream:bsLeft(num, pow)
+    return math.floor(num * 2^pow)
+end
+function Stream:bytesToNum(bytes)
+	local n = 0
+	for k,v in ipairs(bytes) do
+		n = self:bsLeft(n, 8) + v
+	end
+	n = (n > 2147483647) and (n - 4294967296) or n
+	return n
+end
+function Stream:seek(amount)
+	self.position = self.position + amount
+end
+function Stream:readByte()
+	if self.position <= 0 then self:seek(1) return nil end
+	local byte = self.data[self.position]
+	self:seek(1)
+	return byte
+end
+function Stream:readChars(num)
+	if self.position <= 0 then self:seek(1) return nil end
+	local str = ""
+	local i = 1
+	while i <= num do
+		str = str .. self:readChar()
+		i = i + 1
+	end
+	return str, i-1
+end
+function Stream:readChar()
+	if self.position <= 0 then self:seek(1) return nil end
+	return string.char(self:readByte())
+end
+function Stream:readBytes(num)
+	if self.position <= 0 then self:seek(1) return nil end
+	local tabl = {}
+	local i = 1
+	while i <= num do
+		local curByte = self:readByte()
+		if curByte == nil then break end
+		tabl[i] = curByte
+		i = i + 1
+	end
+	return tabl, i-1
+end
+function Stream:readInt(num)
+	if self.position <= 0 then self:seek(1) return nil end
+	num = num or 4
+	local bytes, count = self:readBytes(num)
+	return self:bytesToNum(bytes), count
+end
+function Stream:writeByte(byte)
+	if self.position <= 0 then self:seek(1) return end
+	self.data[self.position] = byte
+	self:seek(1)
+end
+function Stream:writeChar(char)
+	if self.position <= 0 then self:seek(1) return end
+	self:writeByte(string.byte(char))
+end
+function Stream:writeBytes(buffer)
+	if self.position <= 0 then self:seek(1) return end
+	local str = ""
+	for k,v in pairs(buffer) do
+		str = str .. string.char(v)
+	end
+	writeChars(str)
+end
+return Stream
+end
+
+-- file:[./files/libs/png_decode.lua]
+
+function png_decode_wrapper()
+deflate = library and library.deflate or lib_deflate_wrapper()
+class = library and library.log30 or log30_wrapper()
+Stream = library and library.stream or stream_wrapper()
+local Chunk = class()
+Chunk.__name = "Chunk"
+Chunk.length = 0
+Chunk.name = ""
+Chunk.data = ""
+Chunk.crc = ""
+function Chunk:__init(stream)
+	if stream.__name == "Chunk" then
+		self.length = stream.length
+		self.name = stream.name
+		self.data = stream.data
+		self.crc = stream.crc
+	else
+		self.length = stream:readInt()
+		self.name = stream:readChars(4)
+		self.data = stream:readChars(self.length)
+		self.crc = stream:readChars(4)
+	end
+end
+function Chunk:getDataStream()
+	return Stream({input = self.data})
+end
+local IHDR = Chunk:extends()
+IHDR.__name = "IHDR"
+IHDR.width = 0
+IHDR.height = 0
+IHDR.bitDepth = 0
+IHDR.colorType = 0
+IHDR.compression = 0
+IHDR.filter = 0
+IHDR.interlace = 0
+function IHDR:__init(chunk)
+	self.super.__init(self, chunk)
+	local stream = chunk:getDataStream()
+	self.width = stream:readInt()
+	self.height = stream:readInt()
+	self.bitDepth = stream:readByte()
+	self.colorType = stream:readByte()
+	self.compression = stream:readByte()
+	self.filter = stream:readByte()
+	self.interlace = stream:readByte()
+end
+local IDAT = Chunk:extends()
+IDAT.__name = "IDAT"
+function IDAT:__init(chunk)
+	self.super.__init(self, chunk)
+end
+local PLTE = Chunk:extends()
+PLTE.__name = "PLTE"
+PLTE.numColors = 0
+PLTE.colors = {}
+function PLTE:__init(chunk)
+	self.super.__init(self, chunk)
+	self.numColors = math.floor(chunk.length/3)
+	local stream = chunk:getDataStream()
+	for i = 1, self.numColors do
+		self.colors[i] = {
+			R = stream:readByte(),
+			G = stream:readByte(),
+			B = stream:readByte(),
+		}
+	end
+end
+function PLTE:getColor(index)
+	return self.colors[index]
+end
+local Pixel = class()
+Pixel.__name = "Pixel"
+Pixel.R = 0
+Pixel.G = 0
+Pixel.B = 0
+Pixel.A = 0
+function Pixel:__init(stream, depth, colorType, palette)
+	local bps = math.floor(depth/8)
+	if colorType == 0 then
+		local grey = stream:readInt(bps)
+		self.R = grey
+		self.G = grey
+		self.B = grey
+		self.A = 255
+	end
+	if colorType == 2 then
+		self.R = stream:readInt(bps)
+		self.G = stream:readInt(bps)
+		self.B = stream:readInt(bps)
+		self.A = 255
+	end
+	if colorType == 3 then
+		local index = stream:readInt(bps)+1
+		local color = palette:getColor(index)
+		self.R = color.R
+		self.G = color.G
+		self.B = color.B
+		self.A = 255
+	end
+	if colorType == 4 then
+		local grey = stream:readInt(bps)
+		self.R = grey
+		self.G = grey
+		self.B = grey
+		self.A = stream:readInt(bps)
+	end
+	if colorType == 6 then
+		self.R = stream:readInt(bps)
+		self.G = stream:readInt(bps)
+		self.B = stream:readInt(bps)
+		self.A = stream:readInt(bps)
+	end
+end
+function Pixel:format()
+	return string.format("R: %d, G: %d, B: %d, A: %d", self.R, self.G, self.B, self.A)
+end
+local ScanLine = class()
+ScanLine.__name = "ScanLine"
+ScanLine.pixels = {}
+ScanLine.filterType = 0
+function ScanLine:__init(stream, depth, colorType, palette, length)
+	bpp = math.floor(depth/8) * self:bitFromColorType(colorType)
+	bpl = bpp*length
+	self.filterType = stream:readByte()
+	stream:seek(-1)
+	stream:writeByte(0)
+	local startLoc = stream.position
+	if self.filterType == 0 then
+		for i = 1, length do
+			self.pixels[i] = Pixel(stream, depth, colorType, palette)
+		end
+	end
+	if self.filterType == 1 then
+		for i = 1, length do
+			for j = 1, bpp do
+				local curByte = stream:readByte()
+				stream:seek(-(bpp+1))
+				local lastByte = 0
+				if stream.position >= startLoc then lastByte = stream:readByte() or 0 else stream:readByte() end
+				stream:seek(bpp-1)
+				stream:writeByte((curByte + lastByte) % 256)
+			end
+			stream:seek(-bpp)
+			self.pixels[i] = Pixel(stream, depth, colorType, palette)
+		end
+	end
+	if self.filterType == 2 then
+		for i = 1, length do
+			for j = 1, bpp do
+				local curByte = stream:readByte()
+				stream:seek(-(bpl+2))
+				local lastByte = stream:readByte() or 0
+				stream:seek(bpl)
+				stream:writeByte((curByte + lastByte) % 256)
+			end
+			stream:seek(-bpp)
+			self.pixels[i] = Pixel(stream, depth, colorType, palette)
+		end
+	end
+	if self.filterType == 3 then
+		for i = 1, length do
+			for j = 1, bpp do
+				local curByte = stream:readByte()
+				stream:seek(-(bpp+1))
+				local lastByte = 0
+				if stream.position >= startLoc then lastByte = stream:readByte() or 0 else stream:readByte() end
+				stream:seek(-(bpl)+bpp-2)
+				local priByte = stream:readByte() or 0
+				stream:seek(bpl)
+				stream:writeByte((curByte + math.floor((lastByte+priByte)/2)) % 256)
+			end
+			stream:seek(-bpp)
+			self.pixels[i] = Pixel(stream, depth, colorType, palette)
+		end
+	end
+	if self.filterType == 4 then
+		for i = 1, length do
+			for j = 1, bpp do
+				local curByte = stream:readByte()
+				stream:seek(-(bpp+1))
+				local lastByte = 0
+				if stream.position >= startLoc then lastByte = stream:readByte() or 0 else stream:readByte() end
+				stream:seek(-(bpl + 2 - bpp))
+				local priByte = stream:readByte() or 0
+				stream:seek(-(bpp+1))
+				local lastPriByte = 0
+				if stream.position >= startLoc - (length * bpp + 1) then lastPriByte = stream:readByte() or 0 else stream:readByte() end
+				stream:seek(bpl + bpp)
+				stream:writeByte((curByte + self:_PaethPredict(lastByte, priByte, lastPriByte)) % 256)
+			end
+			stream:seek(-bpp)
+			self.pixels[i] = Pixel(stream, depth, colorType, palette)
+		end
+	end
+end
+function ScanLine:bitFromColorType(colorType)
+	if colorType == 0 then return 1 end
+	if colorType == 2 then return 3 end
+	if colorType == 3 then return 1 end
+	if colorType == 4 then return 2 end
+	if colorType == 6 then return 4 end
+	error 'Invalid colortype'
+end
+function ScanLine:getPixel(pixel)
+	return self.pixels[pixel]
+end
+function ScanLine:_PaethPredict(a, b, c)
+	local p = a + b - c
+	local varA = math.abs(p - a)
+	local varB = math.abs(p - b)
+	local varC = math.abs(p - c)
+	if varA <= varB and varA <= varC then return a end
+	if varB <= varC then return b end
+	return c
+end
+local pngImage = class()
+pngImage.__name = "PNG"
+pngImage.width = 0
+pngImage.height = 0
+pngImage.depth = 0
+pngImage.colorType = 0
+pngImage.scanLines = {}
+function pngImage:__init(data, progCallback)
+	local str = Stream({input = data})
+	if str:readChars(8) ~= "\137\080\078\071\013\010\026\010" then error 'Not a PNG' end
+	local ihdr = {}
+	local plte = {}
+	local idat = {}
+	local num = 1
+	while true do
+		ch = Chunk(str)
+		if ch.name == "IHDR" then ihdr = IHDR(ch) end
+		if ch.name == "PLTE" then plte = PLTE(ch) end
+		if ch.name == "IDAT" then idat[num] = IDAT(ch) num = num+1 end
+		if ch.name == "IEND" then break end
+	end
+	self.width = ihdr.width
+	self.height = ihdr.height
+	self.depth = ihdr.bitDepth
+	self.colorType = ihdr.colorType
+	local dataStr = ""
+	for k,v in pairs(idat) do dataStr = dataStr .. v.data end
+	local output = {}
+	deflate.inflate_zlib {input = dataStr, output = function(byte) output[#output+1] = string.char(byte) end, disable_crc = true}
+	imStr = Stream({input = table.concat(output)})
+	for i = 1, self.height do
+		self.scanLines[i] = ScanLine(imStr, self.depth, self.colorType, plte, self.width)
+		if progCallback ~= nil then progCallback(i, self.height) end
+	end
+end
+function pngImage:getPixel(x, y)
+	local pixel = self.scanLines[y].pixels[x]
+	return pixel
+end
+return pngImage
+end
+
+-- file:[./files/libs/png_encode.lua]
+
+function png_encode_wrapper()
+local Png = {}
+Png.__index = Png
+local DEFLATE_MAX_BLOCK_SIZE = 65535
+local function putBigUint32(val, tbl, index)
+    for i=0,3 do
+        tbl[index + i] = bit.band(bit.rshift(val, (3 - i) * 8), 0xFF)
+    end
+end
+function Png:writeBytes(data, index, len)
+    index = index or 1
+    len = len or #data
+    for i=index,index+len-1 do
+        table.insert(self.output, string.char(data[i]))
+    end
+end
+function Png:write(pixels)
+    local count = #pixels  -- Byte count
+    local pixelPointer = 1
+    while count > 0 do
+        if self.positionY >= self.height then
+            error("All image pixels already written")
+        end
+        if self.deflateFilled == 0 then -- Start DEFLATE block
+            local size = DEFLATE_MAX_BLOCK_SIZE;
+            if (self.uncompRemain < size) then
+                size = self.uncompRemain
+            end
+            local header = {  -- 5 bytes long
+                bit.band((self.uncompRemain <= DEFLATE_MAX_BLOCK_SIZE and 1 or 0), 0xFF),
+                bit.band(bit.rshift(size, 0), 0xFF),
+                bit.band(bit.rshift(size, 8), 0xFF),
+                bit.band(bit.bxor(bit.rshift(size, 0), 0xFF), 0xFF),
+                bit.band(bit.bxor(bit.rshift(size, 8), 0xFF), 0xFF),
+            }
+            self:writeBytes(header)
+            self:crc32(header, 1, #header)
+        end
+        assert(self.positionX < self.lineSize and self.deflateFilled < DEFLATE_MAX_BLOCK_SIZE);
+        if (self.positionX == 0) then  -- Beginning of line - write filter method byte
+            local b = {0}
+            self:writeBytes(b)
+            self:crc32(b, 1, 1)
+            self:adler32(b, 1, 1)
+            self.positionX = self.positionX + 1
+            self.uncompRemain = self.uncompRemain - 1
+            self.deflateFilled = self.deflateFilled + 1
+        else -- Write some pixel bytes for current line
+            local n = DEFLATE_MAX_BLOCK_SIZE - self.deflateFilled;
+            if (self.lineSize - self.positionX < n) then
+                n = self.lineSize - self.positionX
+            end
+            if (count < n) then
+                n = count;
+            end
+            assert(n > 0);
+            self:writeBytes(pixels, pixelPointer, n)
+            self:crc32(pixels, pixelPointer, n);
+            self:adler32(pixels, pixelPointer, n);
+            count = count - n;
+            pixelPointer = pixelPointer + n;
+            self.positionX = self.positionX + n;
+            self.uncompRemain = self.uncompRemain - n;
+            self.deflateFilled = self.deflateFilled + n;
+        end
+        if (self.deflateFilled >= DEFLATE_MAX_BLOCK_SIZE) then
+            self.deflateFilled = 0; -- End current block
+        end
+        if (self.positionX == self.lineSize) then  -- Increment line
+            self.positionX = 0;
+            self.positionY = self.positionY + 1;
+            if (self.positionY == self.height) then -- Reached end of pixels
+                local footer = {  -- 20 bytes long
+                    0, 0, 0, 0,  -- DEFLATE Adler-32 placeholder
+                    0, 0, 0, 0,  -- IDAT CRC-32 placeholder
+                    0x00, 0x00, 0x00, 0x00,
+                    0x49, 0x45, 0x4E, 0x44,
+                    0xAE, 0x42, 0x60, 0x82,
+                }
+                putBigUint32(self.adler, footer, 1)
+                self:crc32(footer, 1, 4)
+                putBigUint32(self.crc, footer, 5)
+                self:writeBytes(footer)
+                self.done = true
+            end
+        end
+    end
+end
+function Png:crc32(data, index, len)
+    self.crc = bit.bnot(self.crc)
+    for i=index,index+len-1 do
+        local byte = data[i]
+        for j=0,7 do  -- Inefficient bitwise implementation, instead of table-based
+            local nbit = bit.band(bit.bxor(self.crc, bit.rshift(byte, j)), 1);
+            self.crc = bit.bxor(bit.rshift(self.crc, 1), bit.band((-nbit), 0xEDB88320));
+        end
+    end
+    self.crc = bit.bnot(self.crc)
+end
+function Png:adler32(data, index, len)
+    local s1 = bit.band(self.adler, 0xFFFF)
+    local s2 = bit.rshift(self.adler, 16)
+    for i=index,index+len-1 do
+        s1 = (s1 + data[i]) % 65521
+        s2 = (s2 + s1) % 65521
+    end
+    self.adler = bit.bor(bit.lshift(s2, 16), s1)
+end
+local function begin(width, height, colorMode)
+    colorMode = colorMode or "rgb"
+    local bytesPerPixel, colorType
+    if colorMode == "rgb" then
+        bytesPerPixel, colorType = 3, 2
+    elseif colorMode == "rgba" then
+        bytesPerPixel, colorType = 4, 6
+    else
+        error("Invalid colorMode")
+    end
+    local state = setmetatable({ width = width, height = height, done = false, output = {} }, Png)
+    state.lineSize = width * bytesPerPixel + 1
+    state.uncompRemain = state.lineSize * height
+    local numBlocks = math.ceil(state.uncompRemain / DEFLATE_MAX_BLOCK_SIZE)
+    local idatSize = numBlocks * 5 + 6
+    idatSize = idatSize + state.uncompRemain;
+    local header = {  -- 43 bytes long
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D,
+        0x49, 0x48, 0x44, 0x52,
+        0, 0, 0, 0,  -- 'width' placeholder
+        0, 0, 0, 0,  -- 'height' placeholder
+        0x08, colorType, 0x00, 0x00, 0x00,
+        0, 0, 0, 0,  -- IHDR CRC-32 placeholder
+        0, 0, 0, 0,  -- 'idatSize' placeholder
+        0x49, 0x44, 0x41, 0x54,
+        0x08, 0x1D,
+    }
+    putBigUint32(width, header, 17)
+    putBigUint32(height, header, 21)
+    putBigUint32(idatSize, header, 34)
+    state.crc = 0
+    state:crc32(header, 13, 17)
+    putBigUint32(state.crc, header, 30)
+    state:writeBytes(header)
+    state.crc = 0
+    state:crc32(header, 38, 6);  -- 0xD7245B6B
+    state.adler = 1
+    state.positionX = 0
+    state.positionY = 0
+    state.deflateFilled = 0
+    return state
+end
+return begin
+end
+
+-- file:[./files/library.lua]
+
+library = library or {}
+library.log30 = log30_wrapper()
+library.Stream = stream_wrapper()
+library.deflate = deflate_wrapper()
+library.pngEncode = png_encode_wrapper()
+library.pngDecode = png_decode_wrapper()

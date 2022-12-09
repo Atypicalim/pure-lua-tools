@@ -29,6 +29,13 @@ local orders = {
     "Log",
     "Graphic",
     "dialog",
+    --
+    "libs/log30",
+    "libs/deflate",
+    "libs/stream",
+    "libs/png_decode",
+    "libs/png_encode",
+    'library',
 }
 
 for i,v in ipairs(orders) do

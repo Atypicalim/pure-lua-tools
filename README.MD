@@ -342,6 +342,23 @@ print(time:countDay())
 -- 1 3 5 7 9
 ```
 
+18. library
+
+```lua
+-- write png
+local img = library.pngEncode(4, 4, "rgba")
+while not img.done do
+    img:write({150, 100, 50, 200})
+end
+files.write("./test.png", table.concat(img.output), "wb")
+-- read png
+local data = files.read("./test.png", "rb")
+local img = library.pngDecode(data, printProg)
+local pixel = img:getPixel(2, 2)
+print("size:", img.width, img.height, "depth:", img.depth, "color:", img.colorType)
+print("pixel:", pixel.R, pixel.G, pixel.B, pixel.A)
+```
+
 ![log_test](./others/test_dialog.png)
 
 ---
