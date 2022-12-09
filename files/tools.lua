@@ -37,3 +37,17 @@ function tools.execute(cmd)
     out = out:trim()
     return isOk, out
 end
+
+function tools.get_timezone()
+    local now = os.time()
+    local utc = os.time(os.date("!*t", now))
+    local diff = os.difftime(now, utc)
+    local zone = math.floor(diff / 60 / 60)
+    return zone
+end
+
+function tools.get_milliseconds()
+    local clock = os.clock()
+    local _, milli = math.modf(clock)
+    return math.floor(os.time() * 1000 + milli * 1000)
+end

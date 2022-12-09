@@ -11,6 +11,10 @@ function files.delimiter()
     return delimiter
 end
 
+function files.home()
+    return os.getenv('HOME') or os.getenv('USERPROFILE')
+end
+
 -- current working directory
 local cwd = nil
 function files.cwd()
