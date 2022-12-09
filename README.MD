@@ -316,6 +316,8 @@ print("result:", r)
 -- result: true
 ```
 
+![log_test](./others/test_dialog.png)
+
 16. Path
 
 ```lua
@@ -358,8 +360,6 @@ local pixel = img:getPixel(2, 2)
 print("size:", img.width, img.height, "depth:", img.depth, "color:", img.colorType)
 print("pixel:", pixel.R, pixel.G, pixel.B, pixel.A)
 ```
-
-![log_test](./others/test_dialog.png)
 
 ---
 
