@@ -380,7 +380,6 @@ canvas:drawEllipse(64, 64, 45, 25, {10, 255, 200, 150})
 -- write to file
 local img = library.pngEncode(size, size, "rgba")
 for y=size,1,-1 do
-    print("write:", y)
     for x=1,size do
         img:write(canvas:getPixel(x, y))
     end
