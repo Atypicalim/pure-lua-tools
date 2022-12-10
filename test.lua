@@ -10,6 +10,7 @@ local folder = "./files/"
 local orders = {
     "lua",
     "number",
+    "math",
     "string",
     "table",
     "json",
@@ -29,6 +30,7 @@ local orders = {
     "Log",
     "Graphic",
     "dialog",
+    "canvas",
     --
     "libs/log30",
     "libs/deflate",
