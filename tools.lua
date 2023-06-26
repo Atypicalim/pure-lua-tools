@@ -1,5 +1,5 @@
 
--- tools:[2022-12-10_16:46:58]
+-- tools:[2023-06-26_21:28:15]
 
 -- file:[./files/lua.lua]
 
@@ -498,7 +498,7 @@ function json._encode(v)
     end
     if is_table(v) then
         for i, j in pairs(v) do
-            if encodable(i) and encodable(j) then
+            if json.encodable(i) and json.encodable(j) then
                 table.insert(rval, '"' .. json._encodeString(i) .. '":' .. json._encode(j))
             end
         end
@@ -1654,6 +1654,16 @@ function tools.get_milliseconds()
     local _, milli = math.modf(clock)
     return math.floor(os.time() * 1000 + milli * 1000)
 end
+function tools.rgba_to_hex(r, g, b, a)
+    return bit.lshift(r, 24) + bit.lshift(g, 16) + bit.lshift(b, 8) + a
+end
+function tools.hex_to_rgba(hex)
+    local r = bit.band(bit.rshift(hex, 24), 0xFF)
+    local g = bit.band(bit.rshift(hex, 16), 0xFF)
+    local b = bit.band(bit.rshift(hex, 8), 0xFF)
+    local a = bit.band(hex, 0xFF)
+    return r, g, b, a
+end
 
 -- file:[./files/Object.lua]
 
@@ -2339,12 +2349,8 @@ Canvas = class("Canvas")
 function Canvas:__init__(w, h)
     self._width = w
     self._height = h
+    self._empty = 0x11111111
     self._pixels = {}
-    for y=1,self._height do
-        for x=1,self._width do
-            self:setPixel(x, y, {10, 10, 10, 255})
-        end
-    end
 end
 function Canvas:setPixel(x, y, pixel)
     local xi, xf = math.modf(x)
@@ -2362,7 +2368,6 @@ function Canvas:setPixel(x, y, pixel)
     end
     x = math.round(x)
     y = math.round(y)
-    assert(#pixel == 4)
     if not self._pixels[x] then
         self._pixels[x] = {}
     end
@@ -2370,7 +2375,7 @@ function Canvas:setPixel(x, y, pixel)
     return self
 end
 function Canvas:getPixel(x, y)
-    return self._pixels[x][y]
+    return self._pixels[x][y] or self._empty
 end
 function Canvas:getPixels(x, y, w, h)
     x = x or 1

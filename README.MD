@@ -369,23 +369,25 @@ local size = 128
 local canvas = Canvas(size, size)
 for i=1,size do
     for j=1,size do
-        local c = i + j - 1
-        canvas:setPixel(i, j, {c, c, c, 255})
+        local c = (i + j - 1) % 255
+        canvas:setPixel(i, j, tools.rgba_to_hex(c, c, c, 255))
     end
 end
-canvas:drawLine(16, 16, 112, 112, {255, 0, 0, 255})
-canvas:drawRect(32, 32, 96, 96, false, {10, 255, 255, 255})
-canvas:drawCircle(64, 64, 50, false, {255, 255, 0, 255})
-canvas:drawEllipse(64, 64, 45, 25, {10, 255, 200, 150})
+canvas:drawLine(16, 16, 112, 112, 0xff0000ff)
+canvas:drawRect(32, 32, 96, 96, false, 0x22ffffff)
+canvas:drawCircle(64, 64, 50, false, 0xffff44ff)
+canvas:drawEllipse(64, 64, 45, 25, 0x22ff88ff)
 -- write to file
 local img = library.pngEncode(size, size, "rgba")
 for y=size,1,-1 do
     for x=1,size do
-        img:write(canvas:getPixel(x, y))
+        local px = canvas:getPixel(x, y)
+        local rgba = {tools.hex_to_rgba(px)}
+        img:write(rgba)
     end
 end
 assert(img.done == true)
-files.write("./others/canvas.png", table.concat(img.output), "wb")
+files.write("./others/test_canvas.png", table.concat(img.output), "wb")
 ```
 
 ![log_test](./others/test_canvas.png)

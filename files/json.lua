@@ -35,7 +35,7 @@ function json._encode(v)
     end
     if is_table(v) then
         for i, j in pairs(v) do
-            if encodable(i) and encodable(j) then
+            if json.encodable(i) and json.encodable(j) then
                 table.insert(rval, '"' .. json._encodeString(i) .. '":' .. json._encode(j))
             end
         end

@@ -8,12 +8,8 @@ Canvas = class("Canvas")
 function Canvas:__init__(w, h)
     self._width = w
     self._height = h
+    self._empty = 0x11111111
     self._pixels = {}
-    for y=1,self._height do
-        for x=1,self._width do
-            self:setPixel(x, y, {10, 10, 10, 255})
-        end
-    end
 end
 
 function Canvas:setPixel(x, y, pixel)
@@ -32,7 +28,6 @@ function Canvas:setPixel(x, y, pixel)
     end
     x = math.round(x)
     y = math.round(y)
-    assert(#pixel == 4)
     if not self._pixels[x] then
         self._pixels[x] = {}
     end
@@ -41,7 +36,7 @@ function Canvas:setPixel(x, y, pixel)
 end
 
 function Canvas:getPixel(x, y)
-    return self._pixels[x][y]
+    return self._pixels[x][y] or self._empty
 end
 
 function Canvas:getPixels(x, y, w, h)
