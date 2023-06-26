@@ -383,6 +383,7 @@ for y=size,1,-1 do
     for x=1,size do
         local px = canvas:getPixel(x, y)
         local rgba = {tools.hex_to_rgba(px)}
+        assert(#rgba == 4)
         img:write(rgba)
     end
 end
