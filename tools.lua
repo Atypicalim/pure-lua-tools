@@ -1,5 +1,5 @@
 
--- tools:[2023-06-27_19:24:48]
+-- tools:[2023-06-27_21:50:43]
 
 -- file:[./files/lua.lua]
 
@@ -2384,7 +2384,7 @@ function Canvas:setPixel(x, y, pixel)
     return self
 end
 function Canvas:getPixel(x, y)
-    return self._pixels[x][y] or self._empty
+    return self._pixels[y] and self._pixels[y][x] or self._empty
 end
 function Canvas:getPixels(x, y, w, h)
     x = x or 1
@@ -2471,6 +2471,9 @@ end
 bmp = bmp or {}
 function bmp.write(filename, width, height, pixels)
     local file = assert(io.open(filename, "wb"))
+    assert(width % 4 == 0, "Invalid 4-byte alignment for width")
+    assert(height % 4 == 0, "Invalid 4-byte alignment for height")
+    assert(file ~= nil, 'open file failed:' .. tostring(filename))
     local fileheader = string.char(0x42, 0x4D) -- 文件类型，BM
     local filesize = 54 + 3 * width * height -- 文件大小
     fileheader = fileheader .. string.char(
@@ -2517,6 +2520,7 @@ function bmp.write(filename, width, height, pixels)
 end
 function bmp.read(filename)
     local file = assert(io.open(filename, "rb"))
+    assert(file ~= nil, 'open file failed:' .. tostring(filename))
     local fileheader = file:read(14)
     local filetype = fileheader:sub(1,2)
     assert(filetype == "BM", "Not a BMP file")
@@ -2539,6 +2543,8 @@ function bmp.read(filename)
         infoheader:byte(12) * 16777216
     local bitsperpixel = infoheader:byte(15) +
         infoheader:byte(16) * 256
+    assert(width % 4 == 0, "Invalid 4-byte alignment for width")
+    assert(height % 4 == 0, "Invalid 4-byte alignment for height")
     assert(bitsperpixel == 24, "Only 24-bit BMP files are supported")
     local compression = infoheader:byte(17) +
         infoheader:byte(18) * 256 +
