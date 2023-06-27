@@ -1,5 +1,5 @@
 
--- tools:[2023-06-26_21:28:15]
+-- tools:[2023-06-27_19:24:48]
 
 -- file:[./files/lua.lua]
 
@@ -1654,6 +1654,15 @@ function tools.get_milliseconds()
     local _, milli = math.modf(clock)
     return math.floor(os.time() * 1000 + milli * 1000)
 end
+function tools.rgb_to_hex(r, g, b)
+    return bit.lshift(r, 16) + bit.lshift(g, 8) + b
+end
+function tools.hex_to_rgb(hex)
+    local r = bit.band(bit.rshift(hex, 16), 0xFF)
+    local g = bit.band(bit.rshift(hex, 8), 0xFF)
+    local b = bit.band(hex, 0xFF)
+    return r, g, b
+end
 function tools.rgba_to_hex(r, g, b, a)
     return bit.lshift(r, 24) + bit.lshift(g, 16) + bit.lshift(b, 8) + a
 end
@@ -2349,7 +2358,7 @@ Canvas = class("Canvas")
 function Canvas:__init__(w, h)
     self._width = w
     self._height = h
-    self._empty = 0x11111111
+    self._empty = 0x000000
     self._pixels = {}
 end
 function Canvas:setPixel(x, y, pixel)
@@ -2455,6 +2464,101 @@ function Canvas:drawEllipse(cx, cy, w, h, pixel)
         end
     end
     return self
+end
+
+-- file:[./files/bmp.lua]
+
+bmp = bmp or {}
+function bmp.write(filename, width, height, pixels)
+    local file = assert(io.open(filename, "wb"))
+    local fileheader = string.char(0x42, 0x4D) -- 文件类型，BM
+    local filesize = 54 + 3 * width * height -- 文件大小
+    fileheader = fileheader .. string.char(
+        filesize % 256,
+        math.floor(filesize / 256) % 256,
+        math.floor(filesize / 65536) % 256,
+        math.floor(filesize / 16777216) % 256
+    ) -- 文件大小
+    fileheader = fileheader .. string.rep(string.char(0), 4) -- 保留字段
+    fileheader = fileheader .. string.char(54, 0, 0, 0) -- 数据起始位置
+    local infoheader = string.char(40, 0, 0, 0) -- 信息头大小
+    infoheader = infoheader .. string.char(
+        width % 256,
+        math.floor(width / 256) % 256,
+        math.floor(width / 65536) % 256,
+        math.floor(width / 16777216) % 256
+    ) -- 图像宽度
+    infoheader = infoheader .. string.char(
+        height % 256,
+        math.floor(height / 256) % 256,
+        math.floor(height / 65536) % 256,
+        math.floor(height / 16777216) % 256
+    ) -- 图像高度
+    infoheader = infoheader .. string.char(1, 0) -- 颜色平面数，必须为1
+    infoheader = infoheader .. string.char(24, 0) -- 每个像素的位数，24位
+    infoheader = infoheader .. string.rep(string.char(0), 4) -- 压缩方式，0表示不压缩
+    local imagesize = 3 * width * height
+    infoheader = infoheader .. string.char(
+        imagesize % 256,
+        math.floor(imagesize / 256) % 256,
+        math.floor(imagesize / 65536) % 256,
+        math.floor(imagesize / 16777216) % 256
+    ) -- 图像数据大小
+    infoheader = infoheader .. string.rep(string.char(0), 16) -- 其他信息
+    file:write(fileheader)
+    file:write(infoheader)
+    for y = height, 1, -1 do
+        for x = 1, width do
+            local pixel = pixels[y][x]
+            file:write(string.char(pixel[3], pixel[2], pixel[1]))
+        end
+    end
+    file:close()
+end
+function bmp.read(filename)
+    local file = assert(io.open(filename, "rb"))
+    local fileheader = file:read(14)
+    local filetype = fileheader:sub(1,2)
+    assert(filetype == "BM", "Not a BMP file")
+    local filesize = fileheader:byte(3) +
+        fileheader:byte(4) * 256 +
+        fileheader:byte(5) * 65536 +
+        fileheader:byte(6) * 16777216
+    local datastart = fileheader:byte(11) +
+        fileheader:byte(12) * 256 +
+        fileheader:byte(13) * 65536 +
+        fileheader:byte(14) * 16777216
+    local infoheader = file:read(40)
+    local width = infoheader:byte(5) +
+        infoheader:byte(6) * 256 +
+        infoheader:byte(7) * 65536 +
+        infoheader:byte(8) * 16777216
+    local height = infoheader:byte(9) +
+        infoheader:byte(10) * 256 +
+        infoheader:byte(11) * 65536 +
+        infoheader:byte(12) * 16777216
+    local bitsperpixel = infoheader:byte(15) +
+        infoheader:byte(16) * 256
+    assert(bitsperpixel == 24, "Only 24-bit BMP files are supported")
+    local compression = infoheader:byte(17) +
+        infoheader:byte(18) * 256 +
+        infoheader:byte(19) * 65536 +
+        infoheader:byte(20) * 16777216
+    assert(compression == 0, "Compressed BMP files are not supported")
+    local palette = file:read(datastart - 54)
+    local pixels = {}
+    for y = height, 1, -1 do
+        pixels[y] = {}
+        for x = 1, width do
+            local b = file:read(1):byte()
+            local g = file:read(1):byte()
+            local r = file:read(1):byte()
+            pixels[y][x] = {r, g, b}
+        end
+        file:read((4 - (width * 3) % 4) % 4)
+    end
+    file:close()
+    return width, height, pixels
 end
 
 -- file:[./files/libs/log30.lua]

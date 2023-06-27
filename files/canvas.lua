@@ -8,7 +8,7 @@ Canvas = class("Canvas")
 function Canvas:__init__(w, h)
     self._width = w
     self._height = h
-    self._empty = 0x11111111
+    self._empty = 0x000000
     self._pixels = {}
 end
 

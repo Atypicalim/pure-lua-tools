@@ -31,6 +31,7 @@ local orders = {
     "Graphic",
     "dialog",
     "canvas",
+    "bmp",
     --
     "libs/log30",
     "libs/deflate",

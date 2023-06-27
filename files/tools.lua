@@ -52,6 +52,17 @@ function tools.get_milliseconds()
     return math.floor(os.time() * 1000 + milli * 1000)
 end
 
+function tools.rgb_to_hex(r, g, b)
+    return bit.lshift(r, 16) + bit.lshift(g, 8) + b
+end
+
+function tools.hex_to_rgb(hex)
+    local r = bit.band(bit.rshift(hex, 16), 0xFF)
+    local g = bit.band(bit.rshift(hex, 8), 0xFF)
+    local b = bit.band(hex, 0xFF)
+    return r, g, b
+end
+
 function tools.rgba_to_hex(r, g, b, a)
     return bit.lshift(r, 24) + bit.lshift(g, 16) + bit.lshift(b, 8) + a
 end
