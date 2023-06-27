@@ -6,6 +6,9 @@ bmp = bmp or {}
 
 function bmp.write(filename, width, height, pixels)
     local file = assert(io.open(filename, "wb"))
+    assert(width % 4 == 0, "Invalid 4-byte alignment for width")
+    assert(height % 4 == 0, "Invalid 4-byte alignment for height")
+    assert(file ~= nil, 'open file failed:' .. tostring(filename))
     -- BMP文件头
     local fileheader = string.char(0x42, 0x4D) -- 文件类型，BM
     local filesize = 54 + 3 * width * height -- 文件大小
@@ -57,6 +60,7 @@ end
 
 function bmp.read(filename)
     local file = assert(io.open(filename, "rb"))
+    assert(file ~= nil, 'open file failed:' .. tostring(filename))
     -- BMP文件头
     local fileheader = file:read(14)
     local filetype = fileheader:sub(1,2)
@@ -82,6 +86,8 @@ function bmp.read(filename)
         infoheader:byte(12) * 16777216
     local bitsperpixel = infoheader:byte(15) +
         infoheader:byte(16) * 256
+    assert(width % 4 == 0, "Invalid 4-byte alignment for width")
+    assert(height % 4 == 0, "Invalid 4-byte alignment for height")
     assert(bitsperpixel == 24, "Only 24-bit BMP files are supported")
     local compression = infoheader:byte(17) +
         infoheader:byte(18) * 256 +

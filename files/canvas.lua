@@ -36,7 +36,7 @@ function Canvas:setPixel(x, y, pixel)
 end
 
 function Canvas:getPixel(x, y)
-    return self._pixels[x][y] or self._empty
+    return self._pixels[y] and self._pixels[y][x] or self._empty
 end
 
 function Canvas:getPixels(x, y, w, h)
