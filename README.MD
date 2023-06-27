@@ -395,7 +395,7 @@ files.write("./others/test_canvas.png", table.concat(img.output), "wb")
 
 ![log_test](./others/test_canvas.png)
 
-19. Colors
+19. colors
 
 ```lua
 local rand = colors.get_random_rgb()
@@ -403,7 +403,7 @@ local grey = colors.rgb_get_grayscale(rand)
 local hex = colors.rgb_to_hex(grey)
 ```
 
-20. Bmp
+20. bmp
 
 ```lua
 local size = 128
