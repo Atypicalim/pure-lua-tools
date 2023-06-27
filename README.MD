@@ -370,7 +370,7 @@ local canvas = Canvas(size, size)
 for i=1,size do
     for j=1,size do
         local c = (i + j - 1) % 255
-        canvas:setPixel(i, j, tools.rgba_to_hex(c, c, c, 255))
+        canvas:setPixel(i, j, colors.rgb_to_hex({c, c, c}))
     end
 end
 local c = math.round(size / 2)
@@ -384,8 +384,7 @@ local img = library.pngEncode(size, size, "rgba")
 for y=size,1,-1 do
     for x=1,size do
         local px = canvas:getPixel(x, y)
-        local r, g, b = tools.hex_to_rgb(px)
-        local rgba = {r, g, b, 255}
+        local rgba = table.insert(colors.hex_to_rgb(px), 255)
         assert(#rgba == 4)
         img:write(rgba)
     end
@@ -396,7 +395,15 @@ files.write("./others/test_canvas.png", table.concat(img.output), "wb")
 
 ![log_test](./others/test_canvas.png)
 
-19. Bmp
+19. Colors
+
+```lua
+local rand = colors.get_random_rgb()
+local grey = colors.rgb_get_grayscale(rand)
+local hex = colors.rgb_to_hex(grey)
+```
+
+20. Bmp
 
 ```lua
 local size = 128
