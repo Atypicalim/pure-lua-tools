@@ -24,6 +24,7 @@ local orders = {
     "http",
     "package",
     "tools",
+    "Point",
     "Object",
     "Events",
     "Storage",
@@ -84,3 +85,9 @@ local function build()
     print('finished!')
 end
 -- build()
+
+-- test
+
+local p = Point(50, 50)
+p = p:rotate_by(Point(0, 0), 45)
+table.print(p)
