@@ -32,6 +32,20 @@ function is_object(v)
     return is_table(v) and v.__type__ == 'object'
 end
 
+if not rawget(_G, "lua_print") then
+    rawset(_G, "lua_print", print)
+end
+function print(...)
+    local args = {...}
+    for i,v in ipairs(args) do
+        if is_table(v) then
+            v = table.string(v)
+        end
+        io.write(v, "  ")
+    end
+    io.write('\n')
+end
+
 function to_type(v, tp)
     if type(v) == tp then
         return v

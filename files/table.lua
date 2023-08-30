@@ -106,14 +106,14 @@ function table.string(this, blank, keys, _storey)
     assert(is_table(this))
     _storey = _storey or 1
     local result = table.new()
-    blank = blank or "    "
+    blank = blank or "  "
     --  
     local function convert_key(key)
         local t = type(key)
         if t == 'number' then
-            return "[" .. key .. "]"
+            return "(" .. tostring(key) .. ")"
         elseif t == 'string' then
-            return tostring(key) -- "[\"" .. key .. "\"]"
+            return "[" .. key .. "]"
         end
     end
 
@@ -123,13 +123,15 @@ function table.string(this, blank, keys, _storey)
             return "" .. value .. ""
         elseif t == 'string' then
             return "\"" .. value .. "\""
+        elseif t == 'function' then
+            return "[Function]"
         end
     end
     --
     local function try_convert(k, v)
         local key = convert_key(k)
         local value = is_table(v) and table.string(v, blank, keys, _storey + 1) or convert_value(v)
-        if key and value then
+        if key and value and not key.starts(key, "[__") then
             result:insert(blank:rep(_storey) .. key .. " = " .. value)
         end
     end
