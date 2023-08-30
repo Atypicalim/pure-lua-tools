@@ -10,13 +10,19 @@ function Point:__init__(x, y)
     self.y = y
 end
 
+-- math.pi / 4 -> {x = 0.7, y = 0.7}
 function Point.from_radian(radian)
-    return {x = math.cos(radian), y = math.sin(radian)}
+    return Point(math.cos(radian), math.sin(radian))
 end
 
+-- 0° -> {x = 1, y = 0}
 function Point.from_angle(angle)
     local radian = angle * (math.pi / 180)
     return Point.from_radian(radian)
+end
+
+function Point:clone()
+    return Point(self.x, self.y)
 end
 
 function Point:add(other)
@@ -40,7 +46,7 @@ function Point:middle()
 end
 
 function Point:length()
-    return math.sqrt(self.x * self.x + self.y * self.y)
+    return math.sqrt(self.x ^ 2 + self.y ^ 2)
 end
 
 function Point:distance(other)
@@ -68,23 +74,24 @@ function Point:radian()
     return math.atan2(self.x, self.y)
 end
 
-function Point:angle()
-    return self:radian() * 180 / math.pi
-end
-
-function Point:angle_by(base)
-    if base:length() == 0 then
-        return self:to_angle()
-    end
-    local normalSelf = self:normalize()
-    local normalBase = base:normalize()
-    local cross = normalSelf:cross(normalBase)
-    local dot = normalSelf:dot(normalBase)
-    local atan = math.atan2(cross, dot)
-    if math.abs(atan) < 1.192092896e-7 then
+function Point:angleWithOther(other)
+    local normal1 = other:normalize()
+    local normal2 = self:normalize()
+    local angle = math.atan2(normal1:cross(normal2), normal1:dot(normal2))
+    if math.abs(angle) < 1.192092896e-7 then
         return 0.0
     end
-    return atan * 180 / math.pi
+    return angle * 180 / math.pi;
+end
+
+function Point:angleOfSelf(base)
+    if not base then
+        base = Point(0, 0)
+    end
+    local dx = self.x - base.x
+    local dy = self.y - base.y
+    local angle = math.atan2(dy, dx) * 180 / math.pi
+    return angle
 end
 
 function Point:pProject(other)
@@ -96,10 +103,14 @@ function Point:pRotate(other)
     return Point(self.x * other.x - self.y * other.y, self.x * other.y + self.y * other.x)
 end
 
-function Point:rotate_by(anchorPoint, angle)
-    local sub = self:sub(anchorPoint)
-    local base = Point.from_angle(angle)
-    local vector = sub:pRotate(base)
-    local point = anchorPoint:add(vector)
+function Point:rotate(angle, base)
+    if not base then
+        base = Point(0, 0)
+    end
+    local vector = self:sub(base):pRotate(Point.from_angle(angle))
+    local normal = vector:normalize()
+    local length = self:length()
+    local temp = Point(normal.x * length, normal.y * length)
+    local point = base:add(vector)
     return point
 end
