@@ -425,6 +425,14 @@ assert(w == size and h == size)
 
 ![log_test](./others/test_bmp.bmp)
 
+21. Point
+
+```lua
+local p = Point(10, 10):rotate(-90)
+print(p.x, p.y)
+-- 10 -10
+```
+
 ---
 
 > for more feture plz read the source code ...
