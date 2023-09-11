@@ -73,8 +73,7 @@ function table.count(this, countKeyType, countValueType)
 end
 
 function table.is_array(this)
-    local totalCount, typedCount, _ = table.count(this, 'number', nil)
-    return totalCount == typedCount and typedCount == #this
+    return type(t) == 'table' and #this == table.count(this)
 end
 
 function table.implode(this, separator)
@@ -124,7 +123,7 @@ function table.string(this, blank, keys, _storey)
         elseif t == 'string' then
             return "\"" .. value .. "\""
         elseif t == 'function' then
-            return "[Function]"
+            return "[" .. tostring(value) .. "]"
         end
     end
     --
@@ -148,7 +147,11 @@ function table.string(this, blank, keys, _storey)
     else
         for k,v in pairs(this) do try_convert(k, v) end
     end
-    return string.new("{\n" .. result:implode(",\n") .. "\n" .. blank:rep(_storey - 1) .. "}")
+    local content = ""
+    if #result > 0 then
+        content = "\n" .. result:implode(",\n") .. "\n"
+    end
+    return string.new("{" .. content .. blank:rep(_storey - 1) .. "}")
 end
 
 function table.encode(this)
@@ -162,10 +165,7 @@ function table.decode(st)
 end
 
 function table.print(this)
-    print("[table:" .. lua_get_pointer(this) .. "]")
-    print("[[[[[[[")
-    print(table.string(this))
-    print("]]]]]]]")
+    print("[table:" .. lua_get_pointer(this) .. "](" .. table.string(this, "| ") .. ")")
 end
 
 function table.is_empty(this)

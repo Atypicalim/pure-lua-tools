@@ -40,6 +40,8 @@ function print(...)
     for i,v in ipairs(args) do
         if is_table(v) then
             v = table.string(v)
+        else
+            v = tostring(v)
         end
         io.write(v, "  ")
     end
