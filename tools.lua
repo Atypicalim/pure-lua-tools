@@ -1,5 +1,5 @@
 
--- tools:[2023-09-12_21:31:46]
+-- tools:[2023-09-12_21:52:39]
 
 -- file:[./files/lua.lua]
 
@@ -699,6 +699,14 @@ function yaml.decode(text)
     local stack = { result }
     local current = result
     local anchors = {}
+    local index = 0
+    local lines = {}
+    for line in text:gmatch("[^\r\n]+") do
+        table.insert(lines, line)
+    end
+    local function assertExt(bool, msg)
+        assert(bool, msg .. " at line:" .. index .. ", content:[[" .. lines[index] .. "]]")
+    end
     local function pushStack()
         current = {}
         table.insert(stack, current)
@@ -712,19 +720,22 @@ function yaml.decode(text)
         return current
     end
     local function writeAnchor(name, content)
-        assert(anchors[name] == nil, 'multiple yaml anchor!')
+        assertExt(anchors[name] == nil, 'multiple yaml anchor')
         anchors[name] = content
     end
     local function readAnchor(name, tp)
         local content = anchors[name]
-        assert(content ~= nil, 'invalid yaml anchor!')
+        assertExt(content ~= nil, 'invalid yaml anchor!')
         if tp then
-            assert(type(content) == tp, 'invalid anchor type!')
+            assertExt(type(content) == tp, 'invalid anchor type!')
         end
         return content
     end
     local function consume(index, line, t)
         line = string.trim(line)
+        if line:starts("#") then
+            return
+        end
         if line:match("^-%s*%&%a%w+%s+[^%s]+$") then
             local name, val = line:match("^-%s*%&(%a%w+)%s+([^%s]+)$")
             local key = #t + 1
@@ -749,16 +760,17 @@ function yaml.decode(text)
             end
         elseif line:match("%w+%s*:") then
             local key, val = line:match("^%s*(%w+)%s*:%s*(.*)$")
-            assert(string.valid(key), 'invalid yaml key')
+            assertExt(string.valid(key), 'invalid yaml key')
             if not string.valid(val) then
                 t[key] = pushStack()
             else
                 t[key] = yaml.convert(val)
             end
+        else
+            assertExt(false, 'invalid yaml line!')
         end
     end
-    local index = 0
-    for line in text:gmatch("[^\r\n]+") do
+    for _,line in ipairs(lines) do
         index = index + 1
         local spaces = line:match("^(%s*)")
         local count = #spaces
@@ -771,9 +783,9 @@ function yaml.decode(text)
             consume(index, line, current)
         elseif indent < indenting then
             local num = indenting - indent
-            assert(num < #stack, 'invalid yaml stack!')
+            assertExt(num < #stack, 'invalid yaml stack!')
             for i=1,num do popStack() end
-            assert(current ~= nil, 'invalid yaml stack!')
+            assertExt(current ~= nil, 'invalid yaml stack!')
             consume(index, line, current)
         else
             error('invalid yaml indent!')
