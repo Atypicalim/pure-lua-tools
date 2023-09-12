@@ -433,6 +433,28 @@ print(p.x, p.y)
 -- 10 -10
 ```
 
+22. yaml
+
+```lua
+local text = [[
+time: 2023-09-12_21:30:00+08
+one:&anchor1
+  a:'aaa'
+  b:"bbb"
+two:
+  c:ccc
+  <<:*anchor1
+  d:0xff
+three:
+  - &anchor2 xxx
+  - yyy
+  - zzz
+  - *anchor2
+]]
+local data = yaml.decode(text)
+print(data)
+```
+
 ---
 
 > for more feture plz read the source code ...

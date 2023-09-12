@@ -14,6 +14,7 @@ local orders = {
     "string",
     "table",
     "json",
+    "yaml",
     "class",
     "Path",
     "files",

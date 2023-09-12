@@ -150,8 +150,9 @@ function table.string(this, blank, keys, _storey)
     local content = ""
     if #result > 0 then
         content = "\n" .. result:implode(",\n") .. "\n"
+        content = content .. blank:rep(_storey - 1)
     end
-    return string.new("{" .. content .. blank:rep(_storey - 1) .. "}")
+    return string.new("{" .. content .. "}")
 end
 
 function table.encode(this)
