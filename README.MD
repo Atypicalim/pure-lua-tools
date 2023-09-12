@@ -453,6 +453,25 @@ three:
 ]]
 local data = yaml.decode(text)
 print(data)
+-- {
+--   [one] = {
+--     [a] = "aaa",
+--     [b] = "bbb"
+--   },
+--   [three] = {
+--     (1) = "xxx",
+--     (2) = "yyy",
+--     (3) = "zzz",
+--     (4) = "xxx"
+--   },
+--   [time] = 1694496600,
+--   [two] = {
+--     [a] = "aaa",
+--     [d] = 255,
+--     [c] = "ccc",
+--     [b] = "bbb"
+--   }
+-- }
 ```
 
 ---
