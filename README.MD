@@ -439,14 +439,15 @@ local text = [[
 time: 2023-09-12_21:30:00+08
 one:&anchor1
   a:'aaa'
-  b:"bbb"
+  b:"bbb" # comment2...
 two:
-  c:ccc
+  c:ccc # comment3...
   <<:*anchor1
   d:0xff
 three:
   - &anchor2 xxx
   - yyy
+  # comment1...
   - zzz
   - *anchor2
 ]]
