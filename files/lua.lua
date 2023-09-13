@@ -1,5 +1,9 @@
 -- lua extentions
 
+function null()
+    return null
+end
+
 function is_table(v)
     return type(v) == 'table'
 end
@@ -17,7 +21,7 @@ function is_boolean(v)
 end
 
 function is_nil(v)
-    return type(v) == 'nil'
+    return type(v) == 'nil' or v == null
 end
 
 function is_function(v)
@@ -37,8 +41,11 @@ if not rawget(_G, "lua_print") then
 end
 function print(...)
     local args = {...}
-    for i,v in ipairs(args) do
-        if is_table(v) then
+    for i=1,select("#", ...) do
+        local v = args[i]
+        if v == null then
+            v = "null"
+        elseif is_table(v) then
             v = table.string(v)
         else
             v = tostring(v)

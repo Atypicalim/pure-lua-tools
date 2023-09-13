@@ -4,16 +4,12 @@
 
 yaml = yaml or {}
 
-function yaml.null()
-    return yaml.null
-end
-
 function yaml.convert(val)
     val = string.trim(val)
     -- 
     local low = string.lower(val)
     if low == "null" or low == "~" then
-        return yaml.null
+        return null
     elseif low == "true" or low == "yes" or low == "on" then
         return true
     elseif low == "false" or low == "no" or low == "off" then
@@ -54,6 +50,24 @@ function yaml.convert(val)
     end
     -- 
     return val
+end
+
+function yaml.filter(txt)
+    if txt:starts("'") or txt:starts('"') then
+        -- quote appended comment
+        local firstChar = txt:sub(1, 1)
+        local secondIdx = txt:find(firstChar .. "[^" .. firstChar .. "]*#[^" .. firstChar .. "]*", 2, false)
+        if secondIdx then
+            txt = txt:sub(1, secondIdx)
+        end
+    else
+        -- other appended comment
+        local commentIdx = txt:find("%s*#.*", 1, false)
+        if commentIdx then
+            txt = txt:sub(1, commentIdx - 1)
+        end
+    end
+    return txt
 end
 
 function yaml.decode(text)
@@ -104,26 +118,38 @@ function yaml.decode(text)
         if line:starts("#") then
             return
         end
+        -- appended comment
+        local frm = 1
+        if line:starts("'") then
+            print('-')
+            frm = line:find("'", 2, true)
+        elseif line:starts('"') then
+            print('-')
+            frm = line:find('"', 2, true)
+        end
         -- 
         if line:match("^-%s*%&%a%w+%s+[^%s]+$") then
             -- array anchor define
             local name, val = line:match("^-%s*%&(%a%w+)%s+([^%s]+)$")
+            val = yaml.filter(val)
             local key = #t + 1
             t[key] = yaml.convert(val)
             writeAnchor(name, t[key])
         elseif line:match("^-%s*%*%s*[^%s]+$") then
             -- array anchor use
-            local name, val = line:match("^-%s*%*%s*([^%s]+)$")
+            local name = line:match("^-%s*%*%s*([^%s]+)$")
             local key = #t + 1
             t[key] = readAnchor(name, nil)
         elseif line:match("^-%s*") then
             -- array normal process
             local val = line:sub(2)
+            val = yaml.filter(val)
             local key = #t + 1
             t[key] = yaml.convert(val)
         elseif line:match("^%w+%s*:%s*%&%a%w+$") then
             -- map anchor define
             local key, name = line:match("^(%a%w*)%s*:%s*%&(%a%w*)$")
+            name = yaml.filter(name)
             t[key] = pushStack()
             writeAnchor(name, t[key])
         elseif line:match("^<<:%s*%*%a%w*$") then
@@ -135,6 +161,7 @@ function yaml.decode(text)
         elseif line:match("%w+%s*:") then
             -- map normal process
             local key, val = line:match("^%s*(%w+)%s*:%s*(.*)$")
+            val = yaml.filter(val)
             assertExt(string.valid(key), 'invalid yaml key')
             if not string.valid(val) then
                 t[key] = pushStack()
@@ -166,7 +193,7 @@ function yaml.decode(text)
             assertExt(current ~= nil, 'invalid yaml stack!')
             consume(index, line, current)
         else
-            error('invalid yaml indent!')
+            assertExt(false, 'invalid yaml indent!')
         end
     end
     return result

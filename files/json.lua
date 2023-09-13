@@ -4,13 +4,9 @@
 
 json = json or {}
 
-function json.null()
-    return json.null -- so json.null() will also return json.null ; Simply set t = {first = json.null}
-end
-
 function json.encodable(o)
     local t = type(o)
-    return (t == 'string' or t == 'boolean' or t == 'number' or t == 'nil' or t == 'table') or (t == 'function' and o == json.null)
+    return (t == 'string' or t == 'boolean' or t == 'number' or t == 'nil' or t == 'table') or (t == 'function' and o == null)
 end
 
 function json._encodeString(s)
@@ -23,7 +19,7 @@ function json._encodeString(s)
 end
 
 function json._encode(v)
-    if is_nil(v) or v == json.null then return "null" end
+    if is_nil(v) or v == null then return "null" end
     if is_boolean(v) or is_number(v) then return tostring(v) end
     if is_string(v) then return '"' .. json._encodeString(v) .. '"' end
     local rval = {}

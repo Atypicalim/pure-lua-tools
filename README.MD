@@ -93,11 +93,10 @@ end)
 4. json
 
 ```lua
--- json.null stands for lua nil
 local test = {
     [1] = 'numberKey',
     boolenValue = true,
-    nullValue = json.null,
+    nullValue = null,
     objectValue = {
         stringValue = "json is ready!",
     },

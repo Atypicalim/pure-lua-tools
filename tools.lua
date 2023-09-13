@@ -1,8 +1,11 @@
 
--- tools:[2023-09-12_21:52:39]
+-- tools:[2023-09-13_17:05:39]
 
 -- file:[./files/lua.lua]
 
+function null()
+    return null
+end
 function is_table(v)
     return type(v) == 'table'
 end
@@ -16,7 +19,7 @@ function is_boolean(v)
     return type(v) == 'boolean'
 end
 function is_nil(v)
-    return type(v) == 'nil'
+    return type(v) == 'nil' or v == null
 end
 function is_function(v)
     return type(v) == 'function'
@@ -488,12 +491,9 @@ end
 -- file:[./files/json.lua]
 
 json = json or {}
-function json.null()
-    return json.null -- so json.null() will also return json.null ; Simply set t = {first = json.null}
-end
 function json.encodable(o)
     local t = type(o)
-    return (t == 'string' or t == 'boolean' or t == 'number' or t == 'nil' or t == 'table') or (t == 'function' and o == json.null)
+    return (t == 'string' or t == 'boolean' or t == 'number' or t == 'nil' or t == 'table') or (t == 'function' and o == null)
 end
 function json._encodeString(s)
     s = string.gsub(s, '\\', '\\\\')
@@ -504,7 +504,7 @@ function json._encodeString(s)
     return s
 end
 function json._encode(v)
-    if is_nil(v) or v == json.null then return "null" end
+    if is_nil(v) or v == null then return "null" end
     if is_boolean(v) or is_number(v) then return tostring(v) end
     if is_string(v) then return '"' .. json._encodeString(v) .. '"' end
     local rval = {}
@@ -646,14 +646,11 @@ end
 -- file:[./files/yaml.lua]
 
 yaml = yaml or {}
-function yaml.null()
-    return yaml.null
-end
 function yaml.convert(val)
     val = string.trim(val)
     local low = string.lower(val)
     if low == "null" or low == "~" then
-        return yaml.null
+        return null
     elseif low == "true" or low == "yes" or low == "on" then
         return true
     elseif low == "false" or low == "no" or low == "off" then
@@ -690,6 +687,21 @@ function yaml.convert(val)
         return t
     end
     return val
+end
+function yaml.filter(txt)
+    if txt:starts("'") or txt:starts('"') then
+        local firstChar = txt:sub(1, 1)
+        local secondIdx = txt:find(firstChar .. "[^" .. firstChar .. "]*#[^" .. firstChar .. "]*", 2, false)
+        if secondIdx then
+            txt = txt:sub(1, secondIdx)
+        end
+    else
+        local commentIdx = txt:find("%s*#.*", 1, false)
+        if commentIdx then
+            txt = txt:sub(1, commentIdx - 1)
+        end
+    end
+    return txt
 end
 function yaml.decode(text)
     local spacing = 2
@@ -736,21 +748,32 @@ function yaml.decode(text)
         if line:starts("#") then
             return
         end
+        local frm = 1
+        if line:starts("'") then
+            print('-')
+            frm = line:find("'", 2, true)
+        elseif line:starts('"') then
+            print('-')
+            frm = line:find('"', 2, true)
+        end
         if line:match("^-%s*%&%a%w+%s+[^%s]+$") then
             local name, val = line:match("^-%s*%&(%a%w+)%s+([^%s]+)$")
+            val = yaml.filter(val)
             local key = #t + 1
             t[key] = yaml.convert(val)
             writeAnchor(name, t[key])
         elseif line:match("^-%s*%*%s*[^%s]+$") then
-            local name, val = line:match("^-%s*%*%s*([^%s]+)$")
+            local name = line:match("^-%s*%*%s*([^%s]+)$")
             local key = #t + 1
             t[key] = readAnchor(name, nil)
         elseif line:match("^-%s*") then
             local val = line:sub(2)
+            val = yaml.filter(val)
             local key = #t + 1
             t[key] = yaml.convert(val)
         elseif line:match("^%w+%s*:%s*%&%a%w+$") then
             local key, name = line:match("^(%a%w*)%s*:%s*%&(%a%w*)$")
+            name = yaml.filter(name)
             t[key] = pushStack()
             writeAnchor(name, t[key])
         elseif line:match("^<<:%s*%*%a%w*$") then
@@ -760,6 +783,7 @@ function yaml.decode(text)
             end
         elseif line:match("%w+%s*:") then
             local key, val = line:match("^%s*(%w+)%s*:%s*(.*)$")
+            val = yaml.filter(val)
             assertExt(string.valid(key), 'invalid yaml key')
             if not string.valid(val) then
                 t[key] = pushStack()
@@ -788,7 +812,7 @@ function yaml.decode(text)
             assertExt(current ~= nil, 'invalid yaml stack!')
             consume(index, line, current)
         else
-            error('invalid yaml indent!')
+            assertExt(false, 'invalid yaml indent!')
         end
     end
     return result
