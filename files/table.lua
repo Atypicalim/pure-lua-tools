@@ -73,7 +73,7 @@ function table.count(this, countKeyType, countValueType)
 end
 
 function table.is_array(this)
-    return type(t) == 'table' and #this == table.count(this)
+    return type(this) == 'table' and #this == table.count(this)
 end
 
 function table.implode(this, separator)
@@ -118,12 +118,16 @@ function table.string(this, blank, keys, _storey)
 
     local function convert_value(value)
         local t = type(value)
-        if t == 'number' then
+        if t == 'boolean' then
+            return tostring(value)
+        elseif t == 'number' then
             return "" .. value .. ""
         elseif t == 'string' then
             return "\"" .. value .. "\""
         elseif t == 'function' then
             return "[" .. tostring(value) .. "]"
+        else
+            return tostring(value)
         end
     end
     --

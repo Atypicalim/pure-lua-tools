@@ -1,5 +1,5 @@
 
--- tools:[2023-09-13_17:05:39]
+-- tools:[2023-09-14_12:33:20]
 
 -- file:[./files/lua.lua]
 
@@ -35,8 +35,11 @@ if not rawget(_G, "lua_print") then
 end
 function print(...)
     local args = {...}
-    for i,v in ipairs(args) do
-        if is_table(v) then
+    for i=1,select("#", ...) do
+        local v = args[i]
+        if v == null then
+            v = "null"
+        elseif is_table(v) then
             v = table.string(v)
         else
             v = tostring(v)
@@ -320,7 +323,7 @@ function table.count(this, countKeyType, countValueType)
     return totalCount, keyCount, valueCount
 end
 function table.is_array(this)
-    return type(t) == 'table' and #this == table.count(this)
+    return type(this) == 'table' and #this == table.count(this)
 end
 function table.implode(this, separator)
     return table.concat(this, separator)
@@ -357,12 +360,16 @@ function table.string(this, blank, keys, _storey)
     end
     local function convert_value(value)
         local t = type(value)
-        if t == 'number' then
+        if t == 'boolean' then
+            return tostring(value)
+        elseif t == 'number' then
             return "" .. value .. ""
         elseif t == 'string' then
             return "\"" .. value .. "\""
         elseif t == 'function' then
             return "[" .. tostring(value) .. "]"
+        else
+            return tostring(value)
         end
     end
     local function try_convert(k, v)
