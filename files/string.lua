@@ -34,6 +34,10 @@ function string.slash(this)
     return this:gsub('\\', '/')
 end
 
+function string.implode(t, separator)
+    return table.concat(t, separator)
+end
+
 function string.explode(this, separator, maxCount)
     assert(is_string(this))
     assert(is_string(separator))
@@ -144,4 +148,17 @@ end
 
 function string.ends(this, s)
     return string.sub(this, -#s, -1) == s
+end
+
+function string.render(this, ...)
+    local args = {...}
+    if is_table(args[1]) then
+        args = args[1]
+    end
+    local rgxp = is_array(args) and "{(%d+)}" or "{(%w+)}"
+    local result = this:gsub(rgxp, function(val)
+        local key = is_array(args) and tonumber(val) or val
+        return args[key] and tostring(args[key]) or "{" .. key .. "}"
+    end)
+    return result
 end

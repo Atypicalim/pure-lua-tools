@@ -8,6 +8,10 @@ function is_table(v)
     return type(v) == 'table'
 end
 
+function is_array(v)
+    return type(v) == 'table' and #v == table.count(v)
+end
+
 function is_string(v)
     return type(v) == 'string'
 end
@@ -22,6 +26,16 @@ end
 
 function is_nil(v)
     return type(v) == 'nil' or v == null
+end
+
+function is_empty(v)
+    if is_nil(v) then
+        return true
+    end
+    if is_table(v) then
+        return next(v) == nil
+    end
+    return false
 end
 
 function is_function(v)
@@ -75,6 +89,7 @@ function print_styled(name, ...)
         style_flag = true
         os.execute('cd > nul 2>&1')
     end
+    name = name and string.upper(name) or "RESET"
     local color = STYLE_MAP[name] or STYLE_MAP.RESET
     io.write(string.format('\27[%dm', color))
     print(...)

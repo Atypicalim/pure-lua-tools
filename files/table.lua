@@ -2,10 +2,18 @@
     table
 ]]
 
-function table.new(v)
-    assert(v ~= table)
-    assert(v == nil or type(v) == 'table')
-    return setmetatable(v or {}, {__index = table,})
+function table.new(t, mode)
+    assert(t ~= table)
+    assert(t == nil or type(t) == 'table')
+    return setmetatable(t or {}, {__index = table, __mode = mode})
+end
+
+function table.new_with_weak_key(t)
+    return table.new(t, 'k')
+end
+
+function table.new_with_weak_value(t)
+    return table.new(t, 'v')
 end
 
 function table.clear(this)
@@ -36,6 +44,40 @@ function table.merge(this, that)
         this[k] = v
     end
     return this
+end
+
+function table.sub(this, from, to)
+    assert(is_array(sub))
+    local ret = {}
+    local len = #this
+    from = from or 1
+    to = to or #this
+    if from < 0 then
+        from = from + len + 1
+    end
+    if to < 0 then
+        to = to + len + 1
+    end
+    from = math.max(0, math.min(from, len))
+    to = math.max(0, math.min(to, len))
+    for i=from,to do
+        table.insert(ret, this[i])
+    end
+    return ret
+end
+
+function table.filter(this, func)
+    local ret = {}
+    table.foreach(this, function(k, v)
+        if func(k, v) then
+            if is_array(this) then
+                table.insert(ret, v)
+            else
+                ret[k] = v
+            end
+        end
+    end)
+    return ret
 end
 
 function table.copy(this)
@@ -73,21 +115,25 @@ function table.count(this, countKeyType, countValueType)
 end
 
 function table.is_array(this)
-    return type(this) == 'table' and #this == table.count(this)
+    return is_array(this)
 end
 
 function table.implode(this, separator)
     return table.concat(this, separator)
 end
 
-table.read_from_file = function(path)
+function table.explode(s, separator, maxCount)
+    return string.explode(s, separator, maxCount)
+end
+
+function table.read_from_file(path)
     assert(is_string(path))
     local c = files.read(path)
     if not c then return end
     return c:table()
 end
 
-table.write_to_file = function(this, path)
+function table.write_to_file(this, path)
     assert(is_table(this))
     assert(is_string(path))
     files.write(path, table.string(this))
@@ -193,31 +239,81 @@ function table.is_equal(this, that)
             end
         end
     end
+    for k, v in pairs(that) do
+        if is_table(v) then
+            if not table.is_equal(v, this[k]) then
+                return false
+            end
+        else
+            if v ~= this[k] then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+function table.is_same(this, that)
+    assert(is_table(this))
+    if not is_table(that) then
+        return false
+    end
+    for k, v in pairs(this) do
+        if is_table(v) then
+            if not table.is_same(v, that[k]) then
+                return false
+            end
+        else
+            if type(v) ~= type(that[k]) then
+                return false
+            end
+        end
+    end
+    for k, v in pairs(that) do
+        if is_table(v) then
+            if not table.is_same(v, this[k]) then
+                return false
+            end
+        else
+            if type(v) ~= type(this[k]) then
+                return false
+            end
+        end
+    end
     return true
 end
 
 function table.find_value(this, value)
-    for k, v in pairs(this) do
-        if value == v then
-            return k, v
+    local rKey, rVal = nil, nil
+    table.foreach(this, function(k, v)
+        if v == value then
+            rKey, rVal = k, v
+            return true
         end
-    end
+    end)
+    return rKey, rVal
 end
 
 function table.find_key(this, key)
-    for k, v in pairs(this) do
-        if key == k then
-            return k, v
+    local rKey, rVal = nil, nil
+    table.foreach(this, function(k, v)
+        if k == key then
+            rKey, rVal = k, v
+            return true
         end
-    end
+    end)
+    return rKey, rVal
 end
 
 function table.find_if(this, func)
-    for k, v in pairs(this) do
+    local rKey, rVal = nil, nil
+    table.foreach(this, function(k, v)
         if func(k, v) then
-            return k, v
+            rKey, rVal = k, v
+            return true
         end
-    end
+    end)
+    return rKey, rVal
 end
 
 function table.reorder(this, isAsc, ...)
@@ -237,6 +333,7 @@ function table.reorder(this, isAsc, ...)
                 end
             end
         end
+        return nil
     end)
     return this
 end
@@ -244,11 +341,15 @@ end
 function table.foreach(this, func)
     if table.is_array(this) then
         for i,v in ipairs(this) do
-            func(i,v)
+            if func(i,v) then
+                return
+            end
         end
     else
-        for k,v in pairs(this) do
-            func(k,v)
+        for k,v in pairs(this) do 
+            if func(k,v) then
+                break
+            end
         end
     end
 end
@@ -264,5 +365,41 @@ end
 function table.append(this, other)
     for i,v in ipairs(other) do
         table.insert(this, v)
+    end
+end
+
+function table.remove_value(this, value, count)
+    local num = 0
+    local key = table.find_value(this, value)
+    while key and (not count or num < count) do
+        table.remove_key(this, key)
+        num = num + 1
+        key = table.find_value(this, value)
+    end
+end
+
+function table.remove_key(this, key)
+    if is_array(this) then
+        assert(is_number(key))
+        table.remove(this, key)
+    else
+        assert(is_number(key) or is_string(key))
+        this[key] = nil
+    end
+end
+
+function table.remove_if(this, func)
+    if is_array(this) then
+        for i = #this, 1, -1 do
+            if func(i, this[i]) then
+                table.remove(this, i)
+            end
+        end
+    else
+        for k,v in pairs(this) do
+            if func(k, this[k]) then
+                this[k] = nil
+            end
+        end
     end
 end
