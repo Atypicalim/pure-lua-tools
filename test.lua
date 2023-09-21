@@ -15,6 +15,7 @@ local orders = {
     "table",
     "json",
     "yaml",
+    "plist",
     "class",
     "Path",
     "files",

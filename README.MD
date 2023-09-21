@@ -474,6 +474,30 @@ print(data)
 -- }
 ```
 
+22. plist
+
+```lua
+local text = [[
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>a</key>
+    <array>
+        <real>1</real>
+        <real>2</real>
+    </array>
+    <key>s</key>
+    <string>str...</string>
+    <key>b</key>
+    <true/>
+</dict>
+</plist> 
+]]
+local t = plist.decode(text)
+print(t)
+```
+
 ---
 
 > for more feture plz read the source code ...
