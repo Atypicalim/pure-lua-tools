@@ -496,6 +496,14 @@ local text = [[
 ]]
 local t = plist.decode(text)
 print(t)
+-- {
+--   [a] = {
+--     (1) = 1,
+--     (2) = 2
+--   },
+--   [s] = "str...",
+--   [b] = true
+-- }
 ```
 
 ---
