@@ -1,5 +1,5 @@
 
--- tools:[2023-09-21_22:01:41]
+-- tools:[2023-09-23_20:37:23]
 
 -- file:[./files/lua.lua]
 
@@ -2129,6 +2129,16 @@ function tools.get_milliseconds()
     local _, milli = math.modf(clock)
     return math.floor(os.time() * 1000 + milli * 1000)
 end
+function tools.where_is(program)
+    if tools.is_windows() then
+        return tools.execute([[where "]] .. program .. [["]])
+    else
+        return tools.execute([[which "]] .. program .. [["]])
+    end
+end
+function tools.open_url(url)
+    return tools.execute([[start "]] .. url .. [["]])
+end
 
 -- file:[./files/Point.lua]
 
@@ -2897,6 +2907,14 @@ function dialog.show_input(title, message, default)
     local result = dialog_execute_powershell("show_input", title, message, default)
     if string.valid(result) then
         return result
+    end
+end
+function dialog.open_path(path)
+    if tools.is_windows() then
+        path = dialog_validate_folder(path)
+        return tools.execute([[start %windir%\explorer.exe "]] .. path .. [["]])
+    else
+        assert('open path not implemented on this platform')
     end
 end
 
@@ -3825,7 +3843,7 @@ end
 -- file:[./files/libs/stream.lua]
 
 function stream_wrapper()
-class = library and library.log30 or log30_wrapper()
+local class = library and library.log30 or log30_wrapper()
 local Stream = class()
 Stream.data = {}
 Stream.position = 1
@@ -3920,9 +3938,9 @@ end
 -- file:[./files/libs/png_decode.lua]
 
 function png_decode_wrapper()
-deflate = library and library.deflate or lib_deflate_wrapper()
-class = library and library.log30 or log30_wrapper()
-Stream = library and library.stream or stream_wrapper()
+local deflate = library and library.deflate or lib_deflate_wrapper()
+local class = library and library.log30 or log30_wrapper()
+local Stream = library and library.stream or stream_wrapper()
 local Chunk = class()
 Chunk.__name = "Chunk"
 Chunk.length = 0

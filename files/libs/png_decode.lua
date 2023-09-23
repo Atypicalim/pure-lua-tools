@@ -3,9 +3,9 @@
 ]]
 
 function png_decode_wrapper()
-deflate = library and library.deflate or lib_deflate_wrapper()
-class = library and library.log30 or log30_wrapper()
-Stream = library and library.stream or stream_wrapper()
+local deflate = library and library.deflate or lib_deflate_wrapper()
+local class = library and library.log30 or log30_wrapper()
+local Stream = library and library.stream or stream_wrapper()
 --------------------------------------------begin-------------------------------------------
 
 local Chunk = class()

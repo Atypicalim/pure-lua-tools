@@ -3,7 +3,7 @@
 ]]
 
 function stream_wrapper()
-class = library and library.log30 or log30_wrapper()
+local class = library and library.log30 or log30_wrapper()
 --------------------------------------------begin-------------------------------------------
 
 local Stream = class()

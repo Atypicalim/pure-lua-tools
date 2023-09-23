@@ -163,3 +163,12 @@ function dialog.show_input(title, message, default)
         return result
     end
 end
+
+function dialog.open_path(path)
+    if tools.is_windows() then
+        path = dialog_validate_folder(path)
+        return tools.execute([[start %windir%\explorer.exe "]] .. path .. [["]])
+    else
+        assert('open path not implemented on this platform')
+    end
+end

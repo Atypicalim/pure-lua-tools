@@ -51,3 +51,15 @@ function tools.get_milliseconds()
     local _, milli = math.modf(clock)
     return math.floor(os.time() * 1000 + milli * 1000)
 end
+
+function tools.where_is(program)
+    if tools.is_windows() then
+        return tools.execute([[where "]] .. program .. [["]])
+    else
+        return tools.execute([[which "]] .. program .. [["]])
+    end
+end
+
+function tools.open_url(url)
+    return tools.execute([[start "]] .. url .. [["]])
+end
