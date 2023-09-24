@@ -1,5 +1,5 @@
 
--- tools:[2023-09-23_20:37:23]
+-- tools:[2023-09-24_19:46:26]
 
 -- file:[./files/lua.lua]
 
@@ -52,7 +52,7 @@ function print(...)
         if v == null then
             v = "null"
         elseif is_table(v) then
-            v = table.string(v)
+            v = table.printable(v, "  ")
         else
             v = tostring(v)
         end
@@ -439,37 +439,49 @@ local function to_string(v)
         return tostring(v)
     end
 end
-function table.string(this, blank, keys, _storey)
+local function convert_key(key, isEcho)
+    local t = type(key)
+    if t == 'number' then
+        return isEcho and "(" .. tostring(key) .. ")" or "[" .. key .. "]" 
+    elseif t == 'string' then
+        return isEcho and "[" .. key .. "]" or tostring(key)
+    end
+end
+local function convert_value(value, isEcho)
+    local t = type(value)
+    if t == 'boolean' then
+        return tostring(value)
+    elseif t == 'number' then
+        return "" .. value .. ""
+    elseif t == 'string' then
+        return "\"" .. value .. "\""
+    elseif not isEcho then
+        return
+    elseif t == 'function' then
+        return "[" .. tostring(value) .. "]"
+    elseif is_class(value) then
+        return "[Class:" .. tostring(value) .. "]"
+    elseif is_object(value) then
+        return "[Object:" .. tostring(value) .. "]"
+    else
+        return tostring(value)
+    end
+end
+function table.string(this, blank, keys, isEcho, withHidden, _storey)
     assert(is_table(this))
     _storey = _storey or 1
     local result = table.new()
-    blank = blank or "  "
-    local function convert_key(key)
-        local t = type(key)
-        if t == 'number' then
-            return "(" .. tostring(key) .. ")"
-        elseif t == 'string' then
-            return "[" .. key .. "]"
-        end
-    end
-    local function convert_value(value)
-        local t = type(value)
-        if t == 'boolean' then
-            return tostring(value)
-        elseif t == 'number' then
-            return "" .. value .. ""
-        elseif t == 'string' then
-            return "\"" .. value .. "\""
-        elseif t == 'function' then
-            return "[" .. tostring(value) .. "]"
-        else
-            return tostring(value)
-        end
-    end
+    blank = blank or "    "
     local function try_convert(k, v)
-        local key = convert_key(k)
-        local value = is_table(v) and table.string(v, blank, keys, _storey + 1) or convert_value(v)
-        if key and value and not key.starts(key, "[__") then
+        local valid = withHidden or not string.starts(k, "__")
+        local key = convert_key(k, isEcho)
+        local value = nil
+        if is_table(v) then
+            value = table.string(v, blank, keys, isEcho, withHidden, _storey + 1)
+        else
+            value = convert_value(v, isEcho)
+        end
+        if valid and key and value then
             result:insert(blank:rep(_storey) .. key .. " = " .. value)
         end
     end
@@ -487,10 +499,13 @@ function table.string(this, blank, keys, _storey)
     end
     local content = ""
     if #result > 0 then
-        content = "\n" .. result:implode(",\n") .. "\n"
+        content = "\n" .. result:implode(",\n") .. ",\n"
         content = content .. blank:rep(_storey - 1)
     end
     return string.new("{" .. content .. "}")
+end
+function table.printable(this, blank, keys)
+    return  table.string(this, blank, keys, true)
 end
 function table.encode(this)
     assert(is_table(this))
@@ -501,7 +516,7 @@ function table.decode(st)
     return st:table()
 end
 function table.print(this)
-    print("[table:" .. lua_get_pointer(this) .. "](" .. table.string(this, "| ") .. ")")
+    print("[table:" .. lua_get_pointer(this) .. "](" .. table.printable(this, "| ") .. ")")
 end
 function table.is_empty(this)
     return next(this) == nil

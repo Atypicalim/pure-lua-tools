@@ -60,7 +60,7 @@ function print(...)
         if v == null then
             v = "null"
         elseif is_table(v) then
-            v = table.string(v)
+            v = table.printable(v, "  ")
         else
             v = tostring(v)
         end
