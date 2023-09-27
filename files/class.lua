@@ -18,7 +18,7 @@ local function new(Class, ...)
     local objectMeta = {
         __index = Class,
         __tostring = function(object)
-            return string.format("<object %s>: %s", object.__name__, lua_get_pointer(object))
+            return string.format("<object:%s %s in:%s>", object.__name__, lua_get_pointer(object), object.__path__)
         end
     }
     local object = setmetatable(object, objectMeta)
@@ -40,12 +40,13 @@ function class(name, Base)
     local Class = {
         __type__ = "class",
         __name__ = name,
-        __super__ = Base
+        __super__ = Base,
+        __path__ = lua_script_path(1),
     }
     -- class meta
     local ClassMeta = {
         __tostring = function(Class)
-            return string.format("<Class %s>: %s", Class.__name__, lua_get_pointer(Class))
+            return string.format("<Class:%s %s in:%s>", Class.__name__, lua_get_pointer(Class), Class.__path__)
         end,
         __call = function(Class, ...)
             return new(Class, ...)

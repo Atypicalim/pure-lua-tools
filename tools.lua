@@ -1,5 +1,5 @@
 
--- tools:[2023-09-24_19:46:26]
+-- tools:[2023-09-27_22:41:41]
 
 -- file:[./files/lua.lua]
 
@@ -51,6 +51,8 @@ function print(...)
         local v = args[i]
         if v == null then
             v = "null"
+        elseif is_class(v) or is_object(v) then
+            v = tostring(v)
         elseif is_table(v) then
             v = table.printable(v, "  ")
         else
@@ -138,6 +140,33 @@ function lua_get_pointer(v)
     else
         return nil
     end
+end
+function lua_script_path(level)
+    level = level or 0
+    local info = debug.getinfo(2 + level, "S")
+    if info and info.source and info.source:sub(1, 1) == "@" then
+        return info.source:sub(2)
+    end
+    return nil
+end
+function lua_set_delegate(obj, func)
+    obj.__delegation = func
+    if obj.__delegated then
+        return
+    end
+    local _oldMt = getmetatable(obj)
+    obj.__delegated = true
+    local function index(t, k)
+        local v = rawget(t, k)
+        if v == nil and _oldMt ~= nil and _oldMt.__index ~= nil then
+            v = _oldMt.__index[k]
+        end
+        if v == nil and obj.__delegation then
+            v = function() return obj.__delegation(k) end
+        end
+        return v
+    end
+    setmetatable(obj, {__index = index})
 end
 
 -- file:[./files/number.lua]
@@ -1128,7 +1157,7 @@ local function new(Class, ...)
     local objectMeta = {
         __index = Class,
         __tostring = function(object)
-            return string.format("<object %s>: %s", object.__name__, lua_get_pointer(object))
+            return string.format("<object:%s %s in:%s>", object.__name__, lua_get_pointer(object), object.__path__)
         end
     }
     local object = setmetatable(object, objectMeta)
@@ -1144,11 +1173,12 @@ function class(name, Base)
     local Class = {
         __type__ = "class",
         __name__ = name,
-        __super__ = Base
+        __super__ = Base,
+        __path__ = lua_script_path(1),
     }
     local ClassMeta = {
         __tostring = function(Class)
-            return string.format("<Class %s>: %s", Class.__name__, lua_get_pointer(Class))
+            return string.format("<Class:%s %s in:%s>", Class.__name__, lua_get_pointer(Class), Class.__path__)
         end,
         __call = function(Class, ...)
             return new(Class, ...)
