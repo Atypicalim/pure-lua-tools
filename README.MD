@@ -549,6 +549,10 @@ r = addFunc:call(10, 60)
 print("10 + 60 = " .. r)
 r = addFunc:call(10, nil)
 print("10 + nil = " .. r)
+-- 10 + 20 = 30
+-- 10 + 40 = 60
+-- 10 + 60 = 80
+-- 10 + nil = 0
 
 ```
 
