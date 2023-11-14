@@ -164,6 +164,7 @@ function lua_script_path(level)
 end
 
 function lua_new_decorator(func)
+    assert(func == nil or is_function(func))
     local function _call(self, ...)
         local args = {...}
         if self._bFunc then
@@ -199,18 +200,22 @@ function lua_new_decorator(func)
         _aFunc = nil,
     }
     function decorator:before(func)
+        assert(func == nil or is_function(func))
         self._bFunc = func
         return self
     end
     function decorator:after(func)
+        assert(func == nil or is_function(func))
         self._aFunc = func
         return self
     end
     function decorator:error(func)
+        assert(func == nil or is_function(func))
         self._eFunc = func
         return self
     end
     function decorator:func(func)
+        assert(func == nil or is_function(func))
         self._fFunc = func
         return self
     end
