@@ -163,6 +163,64 @@ function lua_script_path(level)
     return nil
 end
 
+function lua_new_decorator(func)
+    local function _call(self, ...)
+        local args = {...}
+        if self._bFunc then
+            local _results = {self._bFunc(unpack(args))}
+            if #_results > 0 then
+                args = _results
+            end
+        end
+        assert(self._fFunc, 'decorator func not found')
+        local results = nil
+        if not self._eFunc then
+            results = {self._fFunc(unpack(args))}
+        else
+            xpcall(function()
+                results = {self._fFunc(unpack(args))}
+            end, function(e)
+                results = {self._eFunc(e)}
+            end)
+        end
+        assert(results ~= nil, 'decorator logic eror found')
+        if self._aFunc then
+            local _results = {self._aFunc(unpack(results))}
+            if #_results > 0 then
+                results = _results
+            end
+        end
+        return unpack(results)
+    end
+    local decorator = {
+        _bFunc = nil,
+        _fFunc = func,
+        _eFunc = nil,
+        _aFunc = nil,
+    }
+    function decorator:before(func)
+        self._bFunc = func
+        return self
+    end
+    function decorator:after(func)
+        self._aFunc = func
+        return self
+    end
+    function decorator:error(func)
+        self._eFunc = func
+        return self
+    end
+    function decorator:func(func)
+        self._fFunc = func
+        return self
+    end
+    function decorator:call(...)
+        return _call(self, ...)
+    end
+    setmetatable(decorator, {__call = _call})
+    return decorator
+end
+
 function lua_set_delegate(obj, func)
     obj.__delegation = func
     if obj.__delegated then

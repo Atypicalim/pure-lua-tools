@@ -506,6 +506,52 @@ print(t)
 -- }
 ```
 
+23. decorator
+
+```lua
+-- test func
+local tFunc = function(arg1, arg2)
+    return arg1 + arg2
+end
+-- executed befor test func
+local bFunc = function(arg1, arg2)
+    if arg2 == 40 then
+        return arg1, 50 -- change the second argument
+    elseif foo then
+        return nil, arg2 -- set first argument as nil
+    elseif bar then
+        return nil -- set all arguments as nil
+    else
+        -- use given arguments
+    end
+end
+-- executed after test func
+local aFunc = function(result)
+    if result == 70 then
+        return 80 -- change the result
+    elseif foo then
+        return nil -- set result as nil
+    else
+        -- use returend result
+    end
+end
+-- executed when occurs exception
+local eFunc = function(err)
+    return 0 -- fix the result
+end
+-- use decorator
+local addFunc = lua_new_decorator(tFunc):before(bFunc):after(aFunc):error(eFunc)
+r = addFunc:call(10, 20)
+print("10 + 20 = " .. r)
+r = addFunc:call(10, 40)
+print("10 + 40 = " .. r)
+r = addFunc:call(10, 60)
+print("10 + 60 = " .. r)
+r = addFunc:call(10, nil)
+print("10 + nil = " .. r)
+
+```
+
 ---
 
 > for more feture plz read the source code ...
