@@ -62,10 +62,10 @@ function timer.wait(flag)
     end
 end
 
-function timer.delay(seconds, func)
-    local flag = timer.flag()
+local function timer_delay(seconds, func, _flag)
+    _flag = _flag or timer.flag()
     timer_insert(seconds, function()
-        if not timer.running(flag) then
+        if not timer.running(_flag) then
             return
         end
         local isOk, s = xpcall(func, debug.traceback)
@@ -74,12 +74,16 @@ function timer.delay(seconds, func)
             return
         end
         if not s or s <= 0 then
-            timer.finish(flag)
+            timer.finish(_flag)
         else
-            timer.delay(s, func)
+            timer_delay(s, func, _flag)
         end
     end)
-    return flag
+    return _flag
+end
+
+function timer.delay(seconds, func)
+    return timer_delay(seconds, func)
 end
 
 function timer.start()

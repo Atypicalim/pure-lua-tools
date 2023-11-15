@@ -71,33 +71,6 @@ function print(...)
     io.write('\n')
 end
 
-local style_flag = nil
-local STYLE_MAP = {
-    RESET = 0,
-    BOLD = 1,
-    UNDERLINE = 4,
-    INVERSE = 7,
-    BLACK = 90,
-    RED = 91,
-    GREEN = 92,
-    YELLOW = 93,
-    BLUE = 94,
-    MAGENTA = 95,
-    CYAN = 96,
-    WHITE = 97,
-}
-function print_styled(name, ...)
-    if not style_flag then
-        style_flag = true
-        os.execute('cd > nul 2>&1')
-    end
-    name = name and string.upper(name) or "RESET"
-    local color = STYLE_MAP[name] or STYLE_MAP.RESET
-    io.write(string.format('\27[%dm', color))
-    print(...)
-    io.write('\27[0m')
-end
-
 function to_type(v, tp)
     if type(v) == tp then
         return v
