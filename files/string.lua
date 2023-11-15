@@ -150,6 +150,17 @@ function string.ends(this, s)
     return string.sub(this, -#s, -1) == s
 end
 
+function string.limit(this, length, suffix)
+    assert(length > 0, 'invalid limit length')
+    suffix = suffix or "..."
+    assert(length > #suffix, 'invalid limit length')
+    if #this <= length then
+        return this
+    else
+        return stirng.sub(this, 1, length - #suffix) .. suffix
+    end
+end
+
 function string.render(this, ...)
     local args = {...}
     if is_table(args[1]) then

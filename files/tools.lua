@@ -87,8 +87,134 @@ function tools.print_styled(name, ...)
     io.write('\27[0m')
 end
 
+function tools.print_select(selections)
+    selections = selections or {}
+    local TEXT_MIN_LENGTH = 16
+    local TEXT_MAX_LENGTH = 100
+    --
+    if #selections <= 1 then
+        return selections[1], -1
+    end
+    --
+    local lenText = 0
+    for i,v in ipairs(selections) do
+        lenText = math.max(TEXT_MIN_LENGTH, math.min(TEXT_MAX_LENGTH, math.max(lenText, #v)))
+    end
+    --
+    local lenLine = 0
+    local _texts = {}
+    
+    for i,text in ipairs(selections) do
+        local head = string.center(tostring(i), 3, " ")
+        local body = nil
+        if #text <= lenText then
+            body = string.left(text, lenText, " ")
+        else
+            body = string.sub(text, 1, lenText - 3) .. "..."
+        end
+        local line = string.format("| %s. %s |", head, body)
+        _texts[i] = line
+        lenLine = math.max(lenLine, #line)
+    end
+    --
+    print(string.center("select", lenLine, "-"))
+    for i,text in ipairs(_texts) do
+        print(text)
+    end
+    for i=0,#_texts do
+    end
+    print(string.rep("-", lenLine))
+    -- 
+    while true do
+        io.write("> ")
+        local input = io.read()
+        local index = tonumber(input)
+        if index and selections[index] then
+            print('* selected!')
+            return selections[index], index
+        else
+            tools.console_delete(1, nil)
+            print('* select:')
+        end
+    end
+end
+
+function tools.print_confirm()
+    local TEXT_MIN_LENGTH = 25
+    print(string.center("confirm", TEXT_MIN_LENGTH, "-"))
+    print("|" .. string.center("Yes or No ?", TEXT_MIN_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", TEXT_MIN_LENGTH))
+    while true do
+        io.write("> ")
+        local input = string.upper(io.read())
+        if input == "FALSE" or input == "NO" or input == "N" then
+            print('* confirmed!')
+            return false
+        elseif input == "TRUE" or input == "YES" or input == "Y" then
+            print('* confirmed!')
+            return true
+        else
+            tools.console_delete(1, nil)
+            print('* confirm:')
+        end
+    end
+end
+
+function tools.print_inform()
+    local TEXT_MIN_LENGTH = 25
+    print(string.center("confirm", TEXT_MIN_LENGTH, "-"))
+    print("|" .. string.center("Yes ?", TEXT_MIN_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", TEXT_MIN_LENGTH))
+    while true do
+        io.write("> ")
+        local input = string.upper(io.read())
+        if input == "TRUE" or input == "YES" or input == "Y" then
+            print('* informed!')
+            return true
+        else
+            tools.console_delete(1, nil)
+            print('* inform:')
+        end
+    end
+end
+
+function tools.print_enter(isPassword, checkFunc)
+    local TEXT_MIN_LENGTH = 25
+    local title = string.format("Enter a %s ?", isPassword and "pass" or "text")
+    print(string.center("enter", TEXT_MIN_LENGTH, "-"))
+    print("|" .. string.center(title, TEXT_MIN_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", TEXT_MIN_LENGTH))
+    while true do
+        io.write("> ")
+        local input = io.read()
+        local skip = false
+        if #input > 0 then
+            if checkFunc then
+                local isValid, errorMsg = checkFunc(input)
+                if not isValid then
+                    if isPassword then
+                        tools.console_delete(1, "> " .. string.rep("*", #input), false)
+                    end
+                    print("* " .. (errorMsg or "invalid!"))
+                    print('* enter:')
+                    skip = true
+                end
+            end
+            if not skip then
+                if isPassword then
+                    tools.console_delete(1, "> " .. string.rep("*", #input), false)
+                end
+                print('* entered!')
+                return input
+            end
+        else
+            tools.console_delete(1, "* enter:", false)
+        end
+    end
+end
+
 function tools.print_progress(rate, isReplace, format, size, charLeft, charMiddle, charRight)
-    size = size or 50 -- bar length
+    size = size or 63 -- bar length
     format = format or "[ %s %s ]\n" -- bar percent
     local progress = math.max(0, math.min(1, rate))
     local bar = ""
