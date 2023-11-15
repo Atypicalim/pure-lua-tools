@@ -178,9 +178,12 @@ function tools.print_inform()
     end
 end
 
-function tools.print_enter(isPassword, checkFunc)
+function tools.print_enter(isPassword, isNumber, checkFunc)
     local TEXT_MIN_LENGTH = 25
-    local title = string.format("Enter a %s ?", isPassword and "pass" or "text")
+    local tip = "text"
+    if isPassword then tip = "pass" end
+    if isNumber then tip = "numb" end
+    local title = string.format("Enter a %s ?", tip)
     print(string.center("enter", TEXT_MIN_LENGTH, "-"))
     print("|" .. string.center(title, TEXT_MIN_LENGTH - 2, " ") .. "|")
     print(string.rep("-", TEXT_MIN_LENGTH))
@@ -189,13 +192,18 @@ function tools.print_enter(isPassword, checkFunc)
         local input = io.read()
         local skip = false
         if #input > 0 then
+            if isNumber and tonumber(input) == nil then
+                print("* invalid number!")
+                print('* enter:')
+                skip = true
+            end
             if checkFunc then
                 local isValid, errorMsg = checkFunc(input)
                 if not isValid then
                     if isPassword then
                         tools.console_delete(1, "> " .. string.rep("*", #input), false)
                     end
-                    print("* " .. (errorMsg or "invalid!"))
+                    print("* " .. (errorMsg or "invalid format!"))
                     print('* enter:')
                     skip = true
                 end
