@@ -53,11 +53,24 @@ function tools.get_milliseconds()
 end
 
 function tools.where_is(program)
-    if tools.is_windows() then
-        return tools.execute([[where "]] .. program .. [["]])
-    else
-        return tools.execute([[which "]] .. program .. [["]])
+    local command = tools.is_windows() and "where" or "which"
+    local isOk, result = tools.execute(command .. [[ "]] .. program .. [["]])
+    if isOk then
+        local results = string.explode(result, "\n")
+        return unpack(results)
     end
+end
+
+local editorNames = {'notepad', 'code'}
+function tools.edit_file(path)
+    for i,editorName in ipairs(editorNames) do
+        local isFound = tools.where_is(editorName) ~= nil
+        if isFound then
+            os.execute(editorName .. " " .. path)
+            return true
+        end
+    end
+    return false
 end
 
 local style_flag = nil
@@ -87,18 +100,15 @@ function tools.print_styled(name, ...)
     io.write('\27[0m')
 end
 
+local LINE_LENGTH = 50
+
 function tools.print_select(selections)
     selections = selections or {}
-    local TEXT_MIN_LENGTH = 16
-    local TEXT_MAX_LENGTH = 100
+    local LINE_LENGTH = 50
+    local TEXT_LENGTH = LINE_LENGTH - 9
     --
-    if #selections <= 1 then
-        return selections[1], -1
-    end
-    --
-    local lenText = 0
-    for i,v in ipairs(selections) do
-        lenText = math.max(TEXT_MIN_LENGTH, math.min(TEXT_MAX_LENGTH, math.max(lenText, #v)))
+    if #selections <= 0 then
+        return nil, -1
     end
     --
     local lenLine = 0
@@ -107,10 +117,10 @@ function tools.print_select(selections)
     for i,text in ipairs(selections) do
         local head = string.center(tostring(i), 3, " ")
         local body = nil
-        if #text <= lenText then
-            body = string.left(text, lenText, " ")
+        if #text <= TEXT_LENGTH then
+            body = string.left(text, TEXT_LENGTH, " ")
         else
-            body = string.sub(text, 1, lenText - 3) .. "..."
+            body = string.sub(text, 1, TEXT_LENGTH - 3) .. "..."
         end
         local line = string.format("| %s. %s |", head, body)
         _texts[i] = line
@@ -140,10 +150,10 @@ function tools.print_select(selections)
 end
 
 function tools.print_confirm()
-    local TEXT_MIN_LENGTH = 25
-    print(string.center("confirm", TEXT_MIN_LENGTH, "-"))
-    print("|" .. string.center("Yes or No ?", TEXT_MIN_LENGTH - 2, " ") .. "|")
-    print(string.rep("-", TEXT_MIN_LENGTH))
+    local LINE_LENGTH = 50
+    print(string.center("confirm", LINE_LENGTH, "-"))
+    print("|" .. string.center("Yes or No ?", LINE_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", LINE_LENGTH))
     while true do
         io.write("> ")
         local input = string.upper(io.read())
@@ -161,10 +171,10 @@ function tools.print_confirm()
 end
 
 function tools.print_inform()
-    local TEXT_MIN_LENGTH = 25
-    print(string.center("confirm", TEXT_MIN_LENGTH, "-"))
-    print("|" .. string.center("Yes ?", TEXT_MIN_LENGTH - 2, " ") .. "|")
-    print(string.rep("-", TEXT_MIN_LENGTH))
+    local LINE_LENGTH = 50
+    print(string.center("inform", LINE_LENGTH, "-"))
+    print("|" .. string.center("Yes ?", LINE_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", LINE_LENGTH))
     while true do
         io.write("> ")
         local input = string.upper(io.read())
@@ -178,15 +188,67 @@ function tools.print_inform()
     end
 end
 
+function tools.print_edit(_content)
+    _content = _content or ""
+    local content = _content
+    local LINE_LENGTH = 50
+    print(string.center("edit", LINE_LENGTH, "-"))
+    print("|" .. string.center("Edit and Save ?", LINE_LENGTH - 2, " ") .. "|")
+    print("|" .. string.center("e:edit s:save p:print r:revert q:quit", LINE_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", LINE_LENGTH))
+    while true do
+        io.write("> ")
+        local input = string.upper(io.read())
+        if input == "E" or input == "EDIT" then
+            print('* editing:')
+            local path = files.temp()
+            files.write(path, content)
+            tools.edit_file(path)
+            content = files.read(path) or content
+            files.delete(path)
+            print('* edited!')
+        elseif input == "P" or input == "PRINT" then
+            tools.console_delete(1, nil)
+            local lines = {}
+            for line in content:gmatch("[^\r\n]+") do
+                table.insert(lines, line)
+            end
+            for i,v in ipairs(lines) do
+                print("|" .. string.right(tostring(i), 3, " "), v)
+            end
+            print('* printed!')
+        elseif input == "S" or input == "SAVE" then
+            local path = dialog.select_save(title, filter, folder)
+            tools.console_delete(1, nil)
+            if path then
+                files.write(path, content)
+                print('* saved!')
+            end
+        elseif input == "R" or input == "RESET" then
+            content = _content
+            tools.console_delete(1, nil)
+            print('* reverted!')
+        elseif input == "Q" or input == "QUIT" then
+            tools.console_delete(1, nil)
+            print('* quitted!')
+            break
+        else
+            tools.console_delete(1, nil)
+            print('* edit:')
+        end
+    end
+    return content
+end
+
 function tools.print_enter(isPassword, isNumber, checkFunc)
-    local TEXT_MIN_LENGTH = 25
+    local LINE_LENGTH = 50
     local tip = "text"
     if isPassword then tip = "pass" end
     if isNumber then tip = "numb" end
     local title = string.format("Enter a %s ?", tip)
-    print(string.center("enter", TEXT_MIN_LENGTH, "-"))
-    print("|" .. string.center(title, TEXT_MIN_LENGTH - 2, " ") .. "|")
-    print(string.rep("-", TEXT_MIN_LENGTH))
+    print(string.center("enter", LINE_LENGTH, "-"))
+    print("|" .. string.center(title, LINE_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", LINE_LENGTH))
     while true do
         io.write("> ")
         local input = io.read()
@@ -221,9 +283,13 @@ function tools.print_enter(isPassword, isNumber, checkFunc)
     end
 end
 
-function tools.print_progress(rate, isReplace, format, size, charLeft, charMiddle, charRight)
-    size = size or 63 -- bar length
-    format = format or "[ %s %s ]\n" -- bar percent
+function tools.print_progress(rate, isReplace, charLeft, charMiddle, charRight)
+    local LINE_LENGTH = 50
+    charLeft = charLeft ~= nil and charLeft:sub(1, 1) or "="
+    charMiddle = charMiddle ~= nil and charMiddle:sub(1, 1) or ">"
+    charRight = charRight ~= nil and charRight:sub(1, 1) or "-"
+    local size = LINE_LENGTH - 9
+    local format = "[ %s %s ]\n"
     local progress = math.max(0, math.min(1, rate))
     local bar = ""
     local isLeft = false
@@ -242,11 +308,11 @@ function tools.print_progress(rate, isReplace, format, size, charLeft, charMiddl
             isMiddle = false
             isRight = true
         end
-        local char = charRight or "-"
+        local char = charRight
         if isLeft then
-            char = charLeft or "="
+            char = charLeft
         elseif isMiddle then
-            char = charMiddle or ">"
+            char = charMiddle
         end
         bar = bar .. char
     end

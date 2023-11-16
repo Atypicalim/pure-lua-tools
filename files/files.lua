@@ -15,6 +15,13 @@ function files.home()
     return os.getenv('HOME') or os.getenv('USERPROFILE')
 end
 
+function files.temp(name, ext)
+    name = name or "file"
+    ext = ext or "txt"
+    local flag = os.tmpname():sub(2, -2)
+    return string.format("%s/tmp_%s_%s.%s", files.home(), flag, name, ext)
+end
+
 -- current working directory
 local cwd = nil
 function files.cwd()
