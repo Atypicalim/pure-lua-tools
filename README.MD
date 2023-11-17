@@ -634,7 +634,7 @@ print('content:', content)
 -- * quitted!
 -- content:  edited content ...
 ```
-![log_test](./others/test_qrcode.jpg)
+![log_test](./others/test_qrcode.png)
 
 ---
 
