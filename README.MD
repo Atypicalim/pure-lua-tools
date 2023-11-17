@@ -553,7 +553,54 @@ print("10 + nil = " .. r)
 -- 10 + 40 = 60
 -- 10 + 60 = 80
 -- 10 + nil = 0
+```
 
+24. console
+
+```lua
+local confirmed = console.print_confirm()
+print("confirmed:", confirmed)
+-- ---------------------confirm----------------------
+-- |                  Yes or No ?                   |
+-- --------------------------------------------------
+-- > n
+-- * confirmed!
+-- confirmed:  false
+console.print_progress(75)
+-- [ ========================================= 100% ]
+console.print_qrcode("hello...")
+-- ----------------------qrcode----------------------
+-- | qr code body with white and black blocks 
+-- --------------------------------------------------
+local selection = console.print_select({'lua', 'c', 'c++'})
+print('selection:', selection)
+-- ----------------------select----------------------
+-- |  1 . lua                                       |
+-- |  2 . c                                         |
+-- |  3 . c++                                         |
+-- --------------------------------------------------
+-- > 1
+-- * selected!
+-- selection:  lua
+local input = console.print_enter(true)
+print('input:', input)
+-- ----------------------enter-----------------------
+-- |               Enter a password ?               |
+-- --------------------------------------------------
+-- > ******
+-- * entered!
+-- input:  123456
+local content = console.print_edit('origin content ...')
+print('content:', content)
+-- -----------------------edit-----------------------
+-- |     e:Edit s:Save p:Print r:Revert q:Quit      |
+-- --------------------------------------------------
+-- * editing:
+-- * edited!
+-- |  1  edited content ...
+-- * printed!
+-- * quitted!
+-- content:  edited content ...
 ```
 
 ---

@@ -1,5 +1,5 @@
 
--- tools:[2023-09-27_22:41:41]
+-- tools:[2023-11-17_19:08:06]
 
 -- file:[./files/lua.lua]
 
@@ -62,32 +62,6 @@ function print(...)
     end
     io.write('\n')
 end
-local style_flag = nil
-local STYLE_MAP = {
-    RESET = 0,
-    BOLD = 1,
-    UNDERLINE = 4,
-    INVERSE = 7,
-    BLACK = 90,
-    RED = 91,
-    GREEN = 92,
-    YELLOW = 93,
-    BLUE = 94,
-    MAGENTA = 95,
-    CYAN = 96,
-    WHITE = 97,
-}
-function print_styled(name, ...)
-    if not style_flag then
-        style_flag = true
-        os.execute('cd > nul 2>&1')
-    end
-    name = name and string.upper(name) or "RESET"
-    local color = STYLE_MAP[name] or STYLE_MAP.RESET
-    io.write(string.format('\27[%dm', color))
-    print(...)
-    io.write('\27[0m')
-end
 function to_type(v, tp)
     if type(v) == tp then
         return v
@@ -148,6 +122,68 @@ function lua_script_path(level)
         return info.source:sub(2)
     end
     return nil
+end
+function lua_new_decorator(func)
+    assert(func == nil or is_function(func))
+    local function _call(self, ...)
+        local args = {...}
+        if self._bFunc then
+            local _results = {self._bFunc(unpack(args))}
+            if #_results > 0 then
+                args = _results
+            end
+        end
+        assert(self._fFunc, 'decorator func not found')
+        local results = nil
+        if not self._eFunc then
+            results = {self._fFunc(unpack(args))}
+        else
+            xpcall(function()
+                results = {self._fFunc(unpack(args))}
+            end, function(e)
+                results = {self._eFunc(e)}
+            end)
+        end
+        assert(results ~= nil, 'decorator logic eror found')
+        if self._aFunc then
+            local _results = {self._aFunc(unpack(results))}
+            if #_results > 0 then
+                results = _results
+            end
+        end
+        return unpack(results)
+    end
+    local decorator = {
+        _bFunc = nil,
+        _fFunc = func,
+        _eFunc = nil,
+        _aFunc = nil,
+    }
+    function decorator:before(func)
+        assert(func == nil or is_function(func))
+        self._bFunc = func
+        return self
+    end
+    function decorator:after(func)
+        assert(func == nil or is_function(func))
+        self._aFunc = func
+        return self
+    end
+    function decorator:error(func)
+        assert(func == nil or is_function(func))
+        self._eFunc = func
+        return self
+    end
+    function decorator:func(func)
+        assert(func == nil or is_function(func))
+        self._fFunc = func
+        return self
+    end
+    function decorator:call(...)
+        return _call(self, ...)
+    end
+    setmetatable(decorator, {__call = _call})
+    return decorator
 end
 function lua_set_delegate(obj, func)
     obj.__delegation = func
@@ -325,6 +361,16 @@ function string.starts(this, s)
 end
 function string.ends(this, s)
     return string.sub(this, -#s, -1) == s
+end
+function string.limit(this, length, suffix)
+    assert(length > 0, 'invalid limit length')
+    suffix = suffix or "..."
+    assert(length > #suffix, 'invalid limit length')
+    if #this <= length then
+        return this
+    else
+        return stirng.sub(this, 1, length - #suffix) .. suffix
+    end
 end
 function string.render(this, ...)
     local args = {...}
@@ -1304,6 +1350,12 @@ end
 function files.home()
     return os.getenv('HOME') or os.getenv('USERPROFILE')
 end
+function files.temp(name, ext)
+    name = name or "file"
+    ext = ext or "txt"
+    local flag = os.tmpname():sub(2, -2)
+    return string.format("%s/tmp_%s_%s.%s", files.home(), flag, name, ext)
+end
 local cwd = nil
 function files.cwd()
     if cwd then return cwd end
@@ -1986,10 +2038,10 @@ function timer.wait(flag)
         timer.sleep(0.1)
     end
 end
-function timer.delay(seconds, func)
-    local flag = timer.flag()
+local function timer_delay(seconds, func, _flag)
+    _flag = _flag or timer.flag()
     timer_insert(seconds, function()
-        if not timer.running(flag) then
+        if not timer.running(_flag) then
             return
         end
         local isOk, s = xpcall(func, debug.traceback)
@@ -1998,12 +2050,15 @@ function timer.delay(seconds, func)
             return
         end
         if not s or s <= 0 then
-            timer.finish(flag)
+            timer.finish(_flag)
         else
-            timer.delay(s, func)
+            timer_delay(s, func, _flag)
         end
     end)
-    return flag
+    return _flag
+end
+function timer.delay(seconds, func)
+    return timer_delay(seconds, func)
 end
 function timer.start()
     while #timers > 0 do
@@ -2175,14 +2230,329 @@ function tools.get_milliseconds()
     return math.floor(os.time() * 1000 + milli * 1000)
 end
 function tools.where_is(program)
-    if tools.is_windows() then
-        return tools.execute([[where "]] .. program .. [["]])
-    else
-        return tools.execute([[which "]] .. program .. [["]])
+    local command = tools.is_windows() and "where" or "which"
+    local isOk, result = tools.execute(command .. [[ "]] .. program .. [["]])
+    if isOk then
+        local results = string.explode(result, "\n")
+        return unpack(results)
     end
+end
+local editorNames = {'notepad', 'code'}
+function tools.edit_file(path)
+    for i,editorName in ipairs(editorNames) do
+        local isFound = tools.where_is(editorName) ~= nil
+        if isFound then
+            os.execute(editorName .. " " .. path)
+            return true
+        end
+    end
+    return false
 end
 function tools.open_url(url)
     return tools.execute([[start "]] .. url .. [["]])
+end
+
+-- file:[./files/console.lua]
+
+console = console or {}
+local LINE_LENGTH = 50
+local style_flag = nil
+local STYLE_MAP = {
+    RESET = 0,
+    BOLD = 1,
+    UNDERLINE = 4,
+    INVERSE = 7,
+}
+local COLOR_MAP = {
+    BLACK = {90, 40},
+    RED = {91, 41},
+    GREEN = {92, 42},
+    YELLOW = {93, 43},
+    BLUE = {94, 44},
+    MAGENTA = {95, 45},
+    CYAN = {96, 46},
+    WHITE = {97, 47},
+}
+local function _console_print_format(format, ...)
+    local args = {...}
+    if not style_flag then
+        style_flag = true
+        os.execute('cd > nul 2>&1')
+    end
+    io.write(format)
+    for i,v in ipairs(args) do
+        io.write(i == 1 and "" or "  ", v)
+    end
+    io.write('\27[0m')
+end
+function console.print_colorful_no_wrap(fgName, bgName, ...)
+    local fgInfo = COLOR_MAP[fgName] or COLOR_MAP.WHITE
+    local bgInfo = COLOR_MAP[bgName] or COLOR_MAP.BLACK
+    local fgColor = fgInfo[1]
+    local bgColor = bgInfo[2]
+    local format = string.format('\27[%d;%dm', bgColor, fgColor)
+    _console_print_format(format, ...)
+end
+function console.print_colorful_with_wrap(fgName, bgName, ...)
+    console.print_colorful_no_wrap(fgName, bgName, ...)
+    io.write('\n')
+end
+function console.print_colorful(fgName, bgName, ...)
+    print_colorful_with_wrap(fgName, bgName, ...)
+end
+function console.print_styled_no_wrap(name, ...)
+    name = name and string.upper(name) or "RESET"
+    local style = STYLE_MAP[name] or STYLE_MAP.RESETd
+    local format = string.format('\27[%dm', style)
+    _console_print_format(format, ...)
+end
+function console.print_styled_with_wrap(name, ...)
+    console.print_styled_no_wrap(name, ...)
+    io.write('\n')
+end
+function console.print_styled(name, ...)
+    print_styled_with_wrap(name, ...)
+end
+function console.print_inform()
+    print(string.center("inform", LINE_LENGTH, "-"))
+    print("|" .. string.center("Yes ?", LINE_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", LINE_LENGTH))
+    while true do
+        io.write("> ")
+        local input = string.upper(io.read())
+        if input == "TRUE" or input == "YES" or input == "Y" then
+            print('* informed!')
+            return true
+        else
+            console.delete_line(1)
+            print('* inform:')
+        end
+    end
+end
+function console.print_confirm()
+    print(string.center("confirm", LINE_LENGTH, "-"))
+    print("|" .. string.center("Yes or No ?", LINE_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", LINE_LENGTH))
+    while true do
+        io.write("> ")
+        local input = string.upper(io.read())
+        if input == "FALSE" or input == "NO" or input == "N" then
+            print('* confirmed!')
+            return false
+        elseif input == "TRUE" or input == "YES" or input == "Y" then
+            print('* confirmed!')
+            return true
+        else
+            console.delete_line(1)
+            print('* confirm:')
+        end
+    end
+end
+function console.print_progress(rate, isReplace, charLeft, charMiddle, charRight)
+    charLeft = charLeft ~= nil and charLeft:sub(1, 1) or "="
+    charMiddle = charMiddle ~= nil and charMiddle:sub(1, 1) or ">"
+    charRight = charRight ~= nil and charRight:sub(1, 1) or "-"
+    local size = LINE_LENGTH - 9
+    local format = "[ %s %s ]\n"
+    local progress = math.max(0, math.min(1, rate))
+    local bar = ""
+    local isLeft = false
+    local isMiddle = false
+    local isRight = false
+    for i=1,size do
+        local v = i / size
+        local isSmall = v < progress
+        local isBig = v > progress
+        if not isLeft and not isMiddle and not isRight then
+            isLeft = isSmall
+        elseif isLeft and not isMiddle and isBig then
+            isLeft = false
+            isMiddle = true
+        elseif isMiddle and not isRight and isBig then
+            isMiddle = false
+            isRight = true
+        end
+        local char = charRight
+        if isLeft then
+            char = charLeft
+        elseif isMiddle then
+            char = charMiddle
+        end
+        bar = bar .. char
+    end
+    local percent = string.center(string.format("%d%%", progress * 100), 4, " ") 
+    local text = string.format(format, bar, percent)
+    console.delete_line(isReplace and 1 or 0, text, true)
+end
+function console.print_qrcode(content)
+    print(string.center("qrcode", LINE_LENGTH, "-"))
+    print("|")
+    local isOk, datas = library.qrcode(content)
+    assert(isOk == true, 'qrcode generate failed!')
+    local data = {}
+    for i,column in ipairs(datas) do
+        if i ~= 1 then
+            io.write('\n')
+        end
+        for j,row in ipairs(column) do
+            if j == 1 then
+                io.write('|  ')
+            end
+            io.write(row > 0 and "\27[47m  \27[0m" or "  ")
+            if j == #column then
+                io.write('  |')
+            end
+        end
+    end
+    io.write('\n')
+    print("|")
+    print(string.rep("-", LINE_LENGTH))
+end
+function console.print_select(selections)
+    selections = selections or {}
+    local TEXT_LENGTH = LINE_LENGTH - 9
+    if #selections <= 0 then
+        return nil, -1
+    end
+    local lenLine = 0
+    local _texts = {}
+    for i,text in ipairs(selections) do
+        local head = string.center(tostring(i), 3, " ")
+        local body = nil
+        if #text <= TEXT_LENGTH then
+            body = string.left(text, TEXT_LENGTH, " ")
+        else
+            body = string.sub(text, 1, TEXT_LENGTH - 3) .. "..."
+        end
+        local line = string.format("| %s. %s |", head, body)
+        _texts[i] = line
+        lenLine = math.max(lenLine, #line)
+    end
+    print(string.center("select", lenLine, "-"))
+    for i,text in ipairs(_texts) do
+        print(text)
+    end
+    for i=0,#_texts do
+    end
+    print(string.rep("-", lenLine))
+    while true do
+        io.write("> ")
+        local input = io.read()
+        local index = tonumber(input)
+        if index and selections[index] then
+            print('* selected!')
+            return selections[index], index
+        else
+            console.delete_line(1)
+            print('* select:')
+        end
+    end
+end
+function console.print_enter(isPassword, isNumber, checkFunc)
+    local tip = "text"
+    if isPassword then tip = "password" end
+    if isNumber then tip = "number" end
+    local title = string.format("Enter a %s ?", tip)
+    print(string.center("enter", LINE_LENGTH, "-"))
+    print("|" .. string.center(title, LINE_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", LINE_LENGTH))
+    while true do
+        io.write("> ")
+        local input = io.read()
+        local skip = false
+        if #input > 0 then
+            if isNumber and tonumber(input) == nil then
+                print("* invalid number!")
+                print('* enter:')
+                skip = true
+            end
+            if checkFunc then
+                local isValid, errorMsg = checkFunc(input)
+                if not isValid then
+                    if isPassword then
+                        console.delete_line(1, "> " .. string.rep("*", #input), false)
+                    end
+                    print("* " .. (errorMsg or "invalid format!"))
+                    print('* enter:')
+                    skip = true
+                end
+            end
+            if not skip then
+                if isPassword then
+                    console.delete_line(1, "> " .. string.rep("*", #input), false)
+                end
+                print('* entered!')
+                return input
+            end
+        else
+            console.delete_line(1, "* enter:", false)
+        end
+    end
+end
+function console.print_edit(_content)
+    _content = _content or ""
+    local content = _content
+    print(string.center("edit", LINE_LENGTH, "-"))
+    print("|" .. string.center("e:Edit s:Save p:Print r:Revert q:Quit", LINE_LENGTH - 2, " ") .. "|")
+    print(string.rep("-", LINE_LENGTH))
+    while true do
+        io.write("> ")
+        local input = string.upper(io.read())
+        if input == "E" or input == "EDIT" then
+            console.delete_line(1)
+            print('* editing:')
+            local path = files.temp()
+            files.write(path, content)
+            tools.edit_file(path)
+            content = files.read(path) or content
+            files.delete(path)
+            print('* edited!')
+        elseif input == "P" or input == "PRINT" then
+            console.delete_line(1)
+            local lines = {}
+            for line in content:gmatch("[^\r\n]+") do
+                table.insert(lines, line)
+            end
+            for i,v in ipairs(lines) do
+                print("|" .. string.right(tostring(i), 3, " "), v)
+            end
+            print('* printed!')
+        elseif input == "S" or input == "SAVE" then
+            local path = dialog.select_save(title, filter, folder)
+            console.delete_line(1)
+            if path then
+                files.write(path, content)
+                print('* saved!')
+            end
+        elseif input == "R" or input == "RESET" then
+            content = _content
+            console.delete_line(1)
+            print('* reverted!')
+        elseif input == "Q" or input == "QUIT" then
+            console.delete_line(1)
+            print('* quitted!')
+            break
+        else
+            console.delete_line(1)
+            print('* edit:')
+        end
+    end
+    return content
+end
+function console.delete_line(count, replacement, noWrap)
+    local line = math.max(0, count or 1)
+    local text = replacement or ""
+    if noWrap == nil then noWrap = #text == 0 end
+    text = text .. (noWrap and "" or "\n")
+    text = line <= 0 and text or string.format("\027[%dF\027[0J", line) .. text
+    io.write(text)
+end
+function console.clean_screen(replacement, noWrap)
+    local text = replacement or ""
+    if noWrap == nil then noWrap = #text == 0 end
+    text = text .. (noWrap and "" or "\n")
+    text = "\027[2J\027[1;1H" .. text
+    io.write(text)
 end
 
 -- file:[./files/Point.lua]
@@ -3980,6 +4350,969 @@ end
 return Stream
 end
 
+-- file:[./files/libs/qrcode.lua]
+
+function qrcode_wrapper()
+local cclxvi = {[0] = {0,0,0,0,0,0,0,0}, {1,0,0,0,0,0,0,0}, {0,1,0,0,0,0,0,0}, {1,1,0,0,0,0,0,0},
+{0,0,1,0,0,0,0,0}, {1,0,1,0,0,0,0,0}, {0,1,1,0,0,0,0,0}, {1,1,1,0,0,0,0,0},
+{0,0,0,1,0,0,0,0}, {1,0,0,1,0,0,0,0}, {0,1,0,1,0,0,0,0}, {1,1,0,1,0,0,0,0},
+{0,0,1,1,0,0,0,0}, {1,0,1,1,0,0,0,0}, {0,1,1,1,0,0,0,0}, {1,1,1,1,0,0,0,0},
+{0,0,0,0,1,0,0,0}, {1,0,0,0,1,0,0,0}, {0,1,0,0,1,0,0,0}, {1,1,0,0,1,0,0,0},
+{0,0,1,0,1,0,0,0}, {1,0,1,0,1,0,0,0}, {0,1,1,0,1,0,0,0}, {1,1,1,0,1,0,0,0},
+{0,0,0,1,1,0,0,0}, {1,0,0,1,1,0,0,0}, {0,1,0,1,1,0,0,0}, {1,1,0,1,1,0,0,0},
+{0,0,1,1,1,0,0,0}, {1,0,1,1,1,0,0,0}, {0,1,1,1,1,0,0,0}, {1,1,1,1,1,0,0,0},
+{0,0,0,0,0,1,0,0}, {1,0,0,0,0,1,0,0}, {0,1,0,0,0,1,0,0}, {1,1,0,0,0,1,0,0},
+{0,0,1,0,0,1,0,0}, {1,0,1,0,0,1,0,0}, {0,1,1,0,0,1,0,0}, {1,1,1,0,0,1,0,0},
+{0,0,0,1,0,1,0,0}, {1,0,0,1,0,1,0,0}, {0,1,0,1,0,1,0,0}, {1,1,0,1,0,1,0,0},
+{0,0,1,1,0,1,0,0}, {1,0,1,1,0,1,0,0}, {0,1,1,1,0,1,0,0}, {1,1,1,1,0,1,0,0},
+{0,0,0,0,1,1,0,0}, {1,0,0,0,1,1,0,0}, {0,1,0,0,1,1,0,0}, {1,1,0,0,1,1,0,0},
+{0,0,1,0,1,1,0,0}, {1,0,1,0,1,1,0,0}, {0,1,1,0,1,1,0,0}, {1,1,1,0,1,1,0,0},
+{0,0,0,1,1,1,0,0}, {1,0,0,1,1,1,0,0}, {0,1,0,1,1,1,0,0}, {1,1,0,1,1,1,0,0},
+{0,0,1,1,1,1,0,0}, {1,0,1,1,1,1,0,0}, {0,1,1,1,1,1,0,0}, {1,1,1,1,1,1,0,0},
+{0,0,0,0,0,0,1,0}, {1,0,0,0,0,0,1,0}, {0,1,0,0,0,0,1,0}, {1,1,0,0,0,0,1,0},
+{0,0,1,0,0,0,1,0}, {1,0,1,0,0,0,1,0}, {0,1,1,0,0,0,1,0}, {1,1,1,0,0,0,1,0},
+{0,0,0,1,0,0,1,0}, {1,0,0,1,0,0,1,0}, {0,1,0,1,0,0,1,0}, {1,1,0,1,0,0,1,0},
+{0,0,1,1,0,0,1,0}, {1,0,1,1,0,0,1,0}, {0,1,1,1,0,0,1,0}, {1,1,1,1,0,0,1,0},
+{0,0,0,0,1,0,1,0}, {1,0,0,0,1,0,1,0}, {0,1,0,0,1,0,1,0}, {1,1,0,0,1,0,1,0},
+{0,0,1,0,1,0,1,0}, {1,0,1,0,1,0,1,0}, {0,1,1,0,1,0,1,0}, {1,1,1,0,1,0,1,0},
+{0,0,0,1,1,0,1,0}, {1,0,0,1,1,0,1,0}, {0,1,0,1,1,0,1,0}, {1,1,0,1,1,0,1,0},
+{0,0,1,1,1,0,1,0}, {1,0,1,1,1,0,1,0}, {0,1,1,1,1,0,1,0}, {1,1,1,1,1,0,1,0},
+{0,0,0,0,0,1,1,0}, {1,0,0,0,0,1,1,0}, {0,1,0,0,0,1,1,0}, {1,1,0,0,0,1,1,0},
+{0,0,1,0,0,1,1,0}, {1,0,1,0,0,1,1,0}, {0,1,1,0,0,1,1,0}, {1,1,1,0,0,1,1,0},
+{0,0,0,1,0,1,1,0}, {1,0,0,1,0,1,1,0}, {0,1,0,1,0,1,1,0}, {1,1,0,1,0,1,1,0},
+{0,0,1,1,0,1,1,0}, {1,0,1,1,0,1,1,0}, {0,1,1,1,0,1,1,0}, {1,1,1,1,0,1,1,0},
+{0,0,0,0,1,1,1,0}, {1,0,0,0,1,1,1,0}, {0,1,0,0,1,1,1,0}, {1,1,0,0,1,1,1,0},
+{0,0,1,0,1,1,1,0}, {1,0,1,0,1,1,1,0}, {0,1,1,0,1,1,1,0}, {1,1,1,0,1,1,1,0},
+{0,0,0,1,1,1,1,0}, {1,0,0,1,1,1,1,0}, {0,1,0,1,1,1,1,0}, {1,1,0,1,1,1,1,0},
+{0,0,1,1,1,1,1,0}, {1,0,1,1,1,1,1,0}, {0,1,1,1,1,1,1,0}, {1,1,1,1,1,1,1,0},
+{0,0,0,0,0,0,0,1}, {1,0,0,0,0,0,0,1}, {0,1,0,0,0,0,0,1}, {1,1,0,0,0,0,0,1},
+{0,0,1,0,0,0,0,1}, {1,0,1,0,0,0,0,1}, {0,1,1,0,0,0,0,1}, {1,1,1,0,0,0,0,1},
+{0,0,0,1,0,0,0,1}, {1,0,0,1,0,0,0,1}, {0,1,0,1,0,0,0,1}, {1,1,0,1,0,0,0,1},
+{0,0,1,1,0,0,0,1}, {1,0,1,1,0,0,0,1}, {0,1,1,1,0,0,0,1}, {1,1,1,1,0,0,0,1},
+{0,0,0,0,1,0,0,1}, {1,0,0,0,1,0,0,1}, {0,1,0,0,1,0,0,1}, {1,1,0,0,1,0,0,1},
+{0,0,1,0,1,0,0,1}, {1,0,1,0,1,0,0,1}, {0,1,1,0,1,0,0,1}, {1,1,1,0,1,0,0,1},
+{0,0,0,1,1,0,0,1}, {1,0,0,1,1,0,0,1}, {0,1,0,1,1,0,0,1}, {1,1,0,1,1,0,0,1},
+{0,0,1,1,1,0,0,1}, {1,0,1,1,1,0,0,1}, {0,1,1,1,1,0,0,1}, {1,1,1,1,1,0,0,1},
+{0,0,0,0,0,1,0,1}, {1,0,0,0,0,1,0,1}, {0,1,0,0,0,1,0,1}, {1,1,0,0,0,1,0,1},
+{0,0,1,0,0,1,0,1}, {1,0,1,0,0,1,0,1}, {0,1,1,0,0,1,0,1}, {1,1,1,0,0,1,0,1},
+{0,0,0,1,0,1,0,1}, {1,0,0,1,0,1,0,1}, {0,1,0,1,0,1,0,1}, {1,1,0,1,0,1,0,1},
+{0,0,1,1,0,1,0,1}, {1,0,1,1,0,1,0,1}, {0,1,1,1,0,1,0,1}, {1,1,1,1,0,1,0,1},
+{0,0,0,0,1,1,0,1}, {1,0,0,0,1,1,0,1}, {0,1,0,0,1,1,0,1}, {1,1,0,0,1,1,0,1},
+{0,0,1,0,1,1,0,1}, {1,0,1,0,1,1,0,1}, {0,1,1,0,1,1,0,1}, {1,1,1,0,1,1,0,1},
+{0,0,0,1,1,1,0,1}, {1,0,0,1,1,1,0,1}, {0,1,0,1,1,1,0,1}, {1,1,0,1,1,1,0,1},
+{0,0,1,1,1,1,0,1}, {1,0,1,1,1,1,0,1}, {0,1,1,1,1,1,0,1}, {1,1,1,1,1,1,0,1},
+{0,0,0,0,0,0,1,1}, {1,0,0,0,0,0,1,1}, {0,1,0,0,0,0,1,1}, {1,1,0,0,0,0,1,1},
+{0,0,1,0,0,0,1,1}, {1,0,1,0,0,0,1,1}, {0,1,1,0,0,0,1,1}, {1,1,1,0,0,0,1,1},
+{0,0,0,1,0,0,1,1}, {1,0,0,1,0,0,1,1}, {0,1,0,1,0,0,1,1}, {1,1,0,1,0,0,1,1},
+{0,0,1,1,0,0,1,1}, {1,0,1,1,0,0,1,1}, {0,1,1,1,0,0,1,1}, {1,1,1,1,0,0,1,1},
+{0,0,0,0,1,0,1,1}, {1,0,0,0,1,0,1,1}, {0,1,0,0,1,0,1,1}, {1,1,0,0,1,0,1,1},
+{0,0,1,0,1,0,1,1}, {1,0,1,0,1,0,1,1}, {0,1,1,0,1,0,1,1}, {1,1,1,0,1,0,1,1},
+{0,0,0,1,1,0,1,1}, {1,0,0,1,1,0,1,1}, {0,1,0,1,1,0,1,1}, {1,1,0,1,1,0,1,1},
+{0,0,1,1,1,0,1,1}, {1,0,1,1,1,0,1,1}, {0,1,1,1,1,0,1,1}, {1,1,1,1,1,0,1,1},
+{0,0,0,0,0,1,1,1}, {1,0,0,0,0,1,1,1}, {0,1,0,0,0,1,1,1}, {1,1,0,0,0,1,1,1},
+{0,0,1,0,0,1,1,1}, {1,0,1,0,0,1,1,1}, {0,1,1,0,0,1,1,1}, {1,1,1,0,0,1,1,1},
+{0,0,0,1,0,1,1,1}, {1,0,0,1,0,1,1,1}, {0,1,0,1,0,1,1,1}, {1,1,0,1,0,1,1,1},
+{0,0,1,1,0,1,1,1}, {1,0,1,1,0,1,1,1}, {0,1,1,1,0,1,1,1}, {1,1,1,1,0,1,1,1},
+{0,0,0,0,1,1,1,1}, {1,0,0,0,1,1,1,1}, {0,1,0,0,1,1,1,1}, {1,1,0,0,1,1,1,1},
+{0,0,1,0,1,1,1,1}, {1,0,1,0,1,1,1,1}, {0,1,1,0,1,1,1,1}, {1,1,1,0,1,1,1,1},
+{0,0,0,1,1,1,1,1}, {1,0,0,1,1,1,1,1}, {0,1,0,1,1,1,1,1}, {1,1,0,1,1,1,1,1},
+{0,0,1,1,1,1,1,1}, {1,0,1,1,1,1,1,1}, {0,1,1,1,1,1,1,1}, {1,1,1,1,1,1,1,1}}
+local function tbl_to_number(tbl)
+	local n = #tbl
+	local rslt = 0
+	local power = 1
+	for i = 1, n do
+		rslt = rslt + tbl[i]*power
+		power = power*2
+	end
+	return rslt
+end
+local function bit_xor(m, n)
+	local tbl_m = cclxvi[m]
+	local tbl_n = cclxvi[n]
+	local tbl = {}
+	for i = 1, 8 do
+		if(tbl_m[i] ~= tbl_n[i]) then
+			tbl[i] = 1
+		else
+			tbl[i] = 0
+		end
+	end
+	return tbl_to_number(tbl)
+end
+local function binary(x,digits)
+  local s=string.format("%o",x)
+  local a={["0"]="000",["1"]="001", ["2"]="010",["3"]="011",
+		   ["4"]="100",["5"]="101", ["6"]="110",["7"]="111"}
+  s=string.gsub(s,"(.)",function (d) return a[d] end)
+  s = string.gsub(s,"^0*(.*)$","%1")
+  local fmtstring = string.format("%%%ds",digits)
+  local ret = string.format(fmtstring,s)
+  return string.gsub(ret," ","0")
+end
+local function fill_matrix_position(matrix,bitstring,x,y)
+	if bitstring == "1" then
+		matrix[x][y] = 2
+	else
+		matrix[x][y] = -2
+	end
+end
+local function get_mode( str )
+	if string.match(str,"^[0-9]+$") then
+		return 1
+	elseif string.match(str,"^[0-9A-Z $%%*./:+-]+$") then
+		return 2
+	else
+		return 4
+	end
+	assert(false,"never reached") -- luacheck: ignore
+	return nil
+end
+local capacity = {
+  {  19,   16,   13,	9},{  34,   28,   22,   16},{  55,   44,   34,   26},{  80,   64,   48,   36},
+  { 108,   86,   62,   46},{ 136,  108,   76,   60},{ 156,  124,   88,   66},{ 194,  154,  110,   86},
+  { 232,  182,  132,  100},{ 274,  216,  154,  122},{ 324,  254,  180,  140},{ 370,  290,  206,  158},
+  { 428,  334,  244,  180},{ 461,  365,  261,  197},{ 523,  415,  295,  223},{ 589,  453,  325,  253},
+  { 647,  507,  367,  283},{ 721,  563,  397,  313},{ 795,  627,  445,  341},{ 861,  669,  485,  385},
+  { 932,  714,  512,  406},{1006,  782,  568,  442},{1094,  860,  614,  464},{1174,  914,  664,  514},
+  {1276, 1000,  718,  538},{1370, 1062,  754,  596},{1468, 1128,  808,  628},{1531, 1193,  871,  661},
+  {1631, 1267,  911,  701},{1735, 1373,  985,  745},{1843, 1455, 1033,  793},{1955, 1541, 1115,  845},
+  {2071, 1631, 1171,  901},{2191, 1725, 1231,  961},{2306, 1812, 1286,  986},{2434, 1914, 1354, 1054},
+  {2566, 1992, 1426, 1096},{2702, 2102, 1502, 1142},{2812, 2216, 1582, 1222},{2956, 2334, 1666, 1276}}
+local function get_version_eclevel(len,mode,requested_ec_level)
+	local local_mode = mode
+	if mode == 4 then
+		local_mode = 3
+	elseif mode == 8 then
+		local_mode = 4
+	end
+	assert( local_mode <= 4 )
+	local bits, digits, modebits, c
+	local tab = { {10,9,8,8},{12,11,16,10},{14,13,16,12} }
+	local minversion = 40
+	local maxec_level = requested_ec_level or 1
+	local min,max = 1, 4
+	if requested_ec_level and requested_ec_level >= 1 and requested_ec_level <= 4 then
+		min = requested_ec_level
+		max = requested_ec_level
+	end
+	for ec_level=min,max do
+		for version=1,#capacity do
+			bits = capacity[version][ec_level] * 8
+			bits = bits - 4 -- the mode indicator
+			if version < 10 then
+				digits = tab[1][local_mode]
+			elseif version < 27 then
+				digits = tab[2][local_mode]
+			elseif version <= 40 then
+				digits = tab[3][local_mode]
+			end
+			modebits = bits - digits
+			if local_mode == 1 then -- numeric
+				c = math.floor(modebits * 3 / 10)
+			elseif local_mode == 2 then -- alphanumeric
+				c = math.floor(modebits * 2 / 11)
+			elseif local_mode == 3 then -- binary
+				c = math.floor(modebits * 1 / 8)
+			else
+				c = math.floor(modebits * 1 / 13)
+			end
+			if c >= len then
+				if version <= minversion then
+					minversion = version
+					maxec_level = ec_level
+				end
+				break
+			end
+		end
+	end
+	return minversion, maxec_level
+end
+local function get_length(str,version,mode)
+	local i = mode
+	if mode == 4 then
+		i = 3
+	elseif mode == 8 then
+		i = 4
+	end
+	assert( i <= 4 )
+	local tab = { {10,9,8,8},{12,11,16,10},{14,13,16,12} }
+	local digits
+	if version < 10 then
+		digits = tab[1][i]
+	elseif version < 27 then
+		digits = tab[2][i]
+	elseif version <= 40 then
+		digits = tab[3][i]
+	else
+		assert(false, "get_length, version > 40 not supported")
+	end
+	local len = binary(#str,digits)
+	return len
+end
+local function get_version_eclevel_mode_bistringlength(str,requested_ec_level,mode)
+	local local_mode
+	if mode then
+		assert(false,"not implemented")
+		local_mode = mode
+	else
+		local_mode = get_mode(str)
+	end
+	local version, ec_level
+	version, ec_level = get_version_eclevel(#str,local_mode,requested_ec_level)
+	local length_string = get_length(str,version,local_mode)
+	return version,ec_level,binary(local_mode,4),local_mode,length_string
+end
+local asciitbl = {
+	    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  -- 0x01-0x0f
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  -- 0x10-0x1f
+	36, -1, -1, -1, 37, 38, -1, -1, -1, -1, 39, 40, -1, 41, 42, 43,  -- 0x20-0x2f
+	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 44, -1, -1, -1, -1, -1,  -- 0x30-0x3f
+	-1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,  -- 0x40-0x4f
+	25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, -1, -1, -1, -1, -1,  -- 0x50-0x5f
+  }
+local function encode_string_numeric(str)
+	local bitstring = ""
+	local int
+	string.gsub(str,"..?.?",function(a)
+		int = tonumber(a)
+		if #a == 3 then
+			bitstring = bitstring .. binary(int,10)
+		elseif #a == 2 then
+			bitstring = bitstring .. binary(int,7)
+		else
+			bitstring = bitstring .. binary(int,4)
+		end
+	end)
+	return bitstring
+end
+local function encode_string_ascii(str)
+	local bitstring = ""
+	local int
+	local b1, b2
+	string.gsub(str,"..?",function(a)
+		if #a == 2 then
+			b1 = asciitbl[string.byte(string.sub(a,1,1))]
+			b2 = asciitbl[string.byte(string.sub(a,2,2))]
+			int = b1 * 45 + b2
+			bitstring = bitstring .. binary(int,11)
+		else
+			int = asciitbl[string.byte(a)]
+			bitstring = bitstring .. binary(int,6)
+		end
+	  end)
+	return bitstring
+end
+local function encode_string_binary(str)
+	local ret = {}
+	string.gsub(str,".",function(x)
+		ret[#ret + 1] = binary(string.byte(x),8)
+	end)
+	return table.concat(ret)
+end
+local function encode_data(str,mode)
+	if mode == 1 then
+		return encode_string_numeric(str)
+	elseif mode == 2 then
+		return encode_string_ascii(str)
+	elseif mode == 4 then
+		return encode_string_binary(str)
+	else
+		assert(false,"not implemented yet")
+	end
+end
+local function add_pad_data(version,ec_level,data)
+	local count_to_pad, missing_digits
+	local cpty = capacity[version][ec_level] * 8
+	count_to_pad = math.min(4,cpty - #data)
+	if count_to_pad > 0 then
+		data = data .. string.rep("0",count_to_pad)
+	end
+	if math.fmod(#data,8) ~= 0 then
+		missing_digits = 8 - math.fmod(#data,8)
+		data = data .. string.rep("0",missing_digits)
+	end
+	assert(math.fmod(#data,8) == 0)
+	while #data < cpty do
+		data = data .. "11101100"
+		if #data < cpty then
+			data = data .. "00010001"
+		end
+	end
+	return data
+end
+local alpha_int = {
+	[0] = 1,
+	  2,   4,   8,  16,  32,  64, 128,  29,  58, 116, 232, 205, 135,  19,  38,  76,
+	152,  45,  90, 180, 117, 234, 201, 143,   3,   6,  12,  24,  48,  96, 192, 157,
+	 39,  78, 156,  37,  74, 148,  53, 106, 212, 181, 119, 238, 193, 159,  35,  70,
+	140,   5,  10,  20,  40,  80, 160,  93, 186, 105, 210, 185, 111, 222, 161,  95,
+	190,  97, 194, 153,  47,  94, 188, 101, 202, 137,  15,  30,  60, 120, 240, 253,
+	231, 211, 187, 107, 214, 177, 127, 254, 225, 223, 163,  91, 182, 113, 226, 217,
+	175,  67, 134,  17,  34,  68, 136,  13,  26,  52, 104, 208, 189, 103, 206, 129,
+	 31,  62, 124, 248, 237, 199, 147,  59, 118, 236, 197, 151,  51, 102, 204, 133,
+	 23,  46,  92, 184, 109, 218, 169,  79, 158,  33,  66, 132,  21,  42,  84, 168,
+	 77, 154,  41,  82, 164,  85, 170,  73, 146,  57, 114, 228, 213, 183, 115, 230,
+	209, 191,  99, 198, 145,  63, 126, 252, 229, 215, 179, 123, 246, 241, 255, 227,
+	219, 171,  75, 150,  49,  98, 196, 149,  55, 110, 220, 165,  87, 174,  65, 130,
+	 25,  50, 100, 200, 141,   7,  14,  28,  56, 112, 224, 221, 167,  83, 166,  81,
+	162,  89, 178, 121, 242, 249, 239, 195, 155,  43,  86, 172,  69, 138,   9,  18,
+	 36,  72, 144,  61, 122, 244, 245, 247, 243, 251, 235, 203, 139,  11,  22,  44,
+	 88, 176, 125, 250, 233, 207, 131,  27,  54, 108, 216, 173,  71, 142,   0,   0
+}
+local int_alpha = {
+	[0] = 256, -- special value
+	0,   1,  25,   2,  50,  26, 198,   3, 223,  51, 238,  27, 104, 199,  75,   4,
+	100, 224,  14,  52, 141, 239, 129,  28, 193, 105, 248, 200,   8,  76, 113,   5,
+	138, 101,  47, 225,  36,  15,  33,  53, 147, 142, 218, 240,  18, 130,  69,  29,
+	181, 194, 125, 106,  39, 249, 185, 201, 154,   9, 120,  77, 228, 114, 166,   6,
+	191, 139,  98, 102, 221,  48, 253, 226, 152,  37, 179,  16, 145,  34, 136,  54,
+	208, 148, 206, 143, 150, 219, 189, 241, 210,  19,  92, 131,  56,  70,  64,  30,
+	 66, 182, 163, 195,  72, 126, 110, 107,  58,  40,  84, 250, 133, 186,  61, 202,
+	 94, 155, 159,  10,  21, 121,  43,  78, 212, 229, 172, 115, 243, 167,  87,   7,
+	112, 192, 247, 140, 128,  99,  13, 103,  74, 222, 237,  49, 197, 254,  24, 227,
+	165, 153, 119,  38, 184, 180, 124,  17,  68, 146, 217,  35,  32, 137,  46,  55,
+	 63, 209,  91, 149, 188, 207, 205, 144, 135, 151, 178, 220, 252, 190,  97, 242,
+	 86, 211, 171,  20,  42,  93, 158, 132,  60,  57,  83,  71, 109,  65, 162,  31,
+	 45,  67, 216, 183, 123, 164, 118, 196,  23,  73, 236, 127,  12, 111, 246, 108,
+	161,  59,  82,  41, 157,  85, 170, 251,  96, 134, 177, 187, 204,  62,  90, 203,
+	 89,  95, 176, 156, 169, 160,  81,  11, 245,  22, 235, 122, 117,  44, 215,  79,
+	174, 213, 233, 230, 231, 173, 232, 116, 214, 244, 234, 168,  80,  88, 175
+}
+local generator_polynomial = {
+	 [7] = { 21, 102, 238, 149, 146, 229,  87,   0},
+	[10] = { 45,  32,  94,  64,  70, 118,  61,  46,  67, 251,   0 },
+	[13] = { 78, 140, 206, 218, 130, 104, 106, 100,  86, 100, 176, 152,  74,   0 },
+	[15] = {105,  99,   5, 124, 140, 237,  58,  58,  51,  37, 202,  91,  61, 183,   8,   0},
+	[16] = {120, 225, 194, 182, 169, 147, 191,  91,   3,  76, 161, 102, 109, 107, 104, 120,   0},
+	[17] = {136, 163, 243,  39, 150,  99,  24, 147, 214, 206, 123, 239,  43,  78, 206, 139,  43,   0},
+	[18] = {153,  96,  98,   5, 179, 252, 148, 152, 187,  79, 170, 118,  97, 184,  94, 158, 234, 215,   0},
+	[20] = {190, 188, 212, 212, 164, 156, 239,  83, 225, 221, 180, 202, 187,  26, 163,  61,  50,  79,  60,  17,   0},
+	[22] = {231, 165, 105, 160, 134, 219,  80,  98, 172,   8,  74, 200,  53, 221, 109,  14, 230,  93, 242, 247, 171, 210,   0},
+	[24] = { 21, 227,  96,  87, 232, 117,   0, 111, 218, 228, 226, 192, 152, 169, 180, 159, 126, 251, 117, 211,  48, 135, 121, 229,   0},
+	[26] = { 70, 218, 145, 153, 227,  48, 102,  13, 142, 245,  21, 161,  53, 165,  28, 111, 201, 145,  17, 118, 182, 103,   2, 158, 125, 173,   0},
+	[28] = {123,   9,  37, 242, 119, 212, 195,  42,  87, 245,  43,  21, 201, 232,  27, 205, 147, 195, 190, 110, 180, 108, 234, 224, 104, 200, 223, 168,   0},
+	[30] = {180, 192,  40, 238, 216, 251,  37, 156, 130, 224, 193, 226, 173,  42, 125, 222,  96, 239,  86, 110,  48,  50, 182, 179,  31, 216, 152, 145, 173, 41, 0}}
+local function convert_bitstring_to_bytes(data)
+	local msg = {}
+	string.gsub(data,"(........)",function(x)
+		msg[#msg+1] = tonumber(x,2)
+	end)
+	return msg
+end
+local function get_generator_polynominal_adjusted(num_ec_codewords,highest_exponent)
+	local gp_alpha = {[0]=0}
+	for i=0,highest_exponent - num_ec_codewords - 1 do
+		gp_alpha[i] = 0
+	end
+	local gp = generator_polynomial[num_ec_codewords]
+	for i=1,num_ec_codewords + 1 do
+		gp_alpha[highest_exponent - num_ec_codewords + i - 1] = gp[i]
+	end
+	return gp_alpha
+end
+local function convert_to_alpha( tab )
+	local new_tab = {}
+	for i=0,#tab do
+		new_tab[i] = int_alpha[tab[i]]
+	end
+	return new_tab
+end
+local function convert_to_int(tab)
+	local new_tab = {}
+	for i=0,#tab do
+		new_tab[i] = alpha_int[tab[i]]
+	end
+	return new_tab
+end
+local function calculate_error_correction(data,num_ec_codewords)
+	local mp
+	if type(data)=="string" then
+		mp = convert_bitstring_to_bytes(data)
+	elseif type(data)=="table" then
+		mp = data
+	else
+		assert(false,string.format("Unknown type for data: %s",type(data)))
+	end
+	local len_message = #mp
+	local highest_exponent = len_message + num_ec_codewords - 1
+	local gp_alpha,tmp
+	local he
+	local gp_int, mp_alpha
+	local mp_int = {}
+	for i=1,len_message do
+		mp_int[highest_exponent - i + 1] = mp[i]
+	end
+	for i=1,highest_exponent - len_message do
+		mp_int[i] = 0
+	end
+	mp_int[0] = 0
+	mp_alpha = convert_to_alpha(mp_int)
+	while highest_exponent >= num_ec_codewords do
+		gp_alpha = get_generator_polynominal_adjusted(num_ec_codewords,highest_exponent)
+		local exp = mp_alpha[highest_exponent]
+		for i=highest_exponent,highest_exponent - num_ec_codewords,-1 do
+			if exp ~= 256 then
+				if gp_alpha[i] + exp >= 255 then
+					gp_alpha[i] = math.fmod(gp_alpha[i] + exp,255)
+				else
+					gp_alpha[i] = gp_alpha[i] + exp
+				end
+			else
+				gp_alpha[i] = 256
+			end
+		end
+		for i=highest_exponent - num_ec_codewords - 1,0,-1 do
+			gp_alpha[i] = 256
+		end
+		gp_int = convert_to_int(gp_alpha)
+		mp_int = convert_to_int(mp_alpha)
+		tmp = {}
+		for i=highest_exponent,0,-1 do
+			tmp[i] = bit_xor(gp_int[i],mp_int[i])
+		end
+		he = highest_exponent
+		for i=he,0,-1 do
+			if i < num_ec_codewords then break end
+			if tmp[i] == 0 then
+				tmp[i] = nil
+				highest_exponent = highest_exponent - 1
+			else
+				break
+			end
+		end
+		mp_int = tmp
+		mp_alpha = convert_to_alpha(mp_int)
+	end
+	local ret = {}
+	for i=#mp_int,0,-1 do
+		ret[#ret + 1] = mp_int[i]
+	end
+	return ret
+end
+local ecblocks = {
+  {{  1,{ 26, 19, 2}                 },   {  1,{26,16, 4}},                  {  1,{26,13, 6}},                  {  1, {26, 9, 8}               }},
+  {{  1,{ 44, 34, 4}                 },   {  1,{44,28, 8}},                  {  1,{44,22,11}},                  {  1, {44,16,14}               }},
+  {{  1,{ 70, 55, 7}                 },   {  1,{70,44,13}},                  {  2,{35,17, 9}},                  {  2, {35,13,11}               }},
+  {{  1,{100, 80,10}                 },   {  2,{50,32, 9}},                  {  2,{50,24,13}},                  {  4, {25, 9, 8}               }},
+  {{  1,{134,108,13}                 },   {  2,{67,43,12}},                  {  2,{33,15, 9},  2,{34,16, 9}},   {  2, {33,11,11},  2,{34,12,11}}},
+  {{  2,{ 86, 68, 9}                 },   {  4,{43,27, 8}},                  {  4,{43,19,12}},                  {  4, {43,15,14}               }},
+  {{  2,{ 98, 78,10}                 },   {  4,{49,31, 9}},                  {  2,{32,14, 9},  4,{33,15, 9}},   {  4, {39,13,13},  1,{40,14,13}}},
+  {{  2,{121, 97,12}                 },   {  2,{60,38,11},  2,{61,39,11}},   {  4,{40,18,11},  2,{41,19,11}},   {  4, {40,14,13},  2,{41,15,13}}},
+  {{  2,{146,116,15}                 },   {  3,{58,36,11},  2,{59,37,11}},   {  4,{36,16,10},  4,{37,17,10}},   {  4, {36,12,12},  4,{37,13,12}}},
+  {{  2,{ 86, 68, 9},  2,{ 87, 69, 9}},   {  4,{69,43,13},  1,{70,44,13}},   {  6,{43,19,12},  2,{44,20,12}},   {  6, {43,15,14},  2,{44,16,14}}},
+  {{  4,{101, 81,10}                 },   {  1,{80,50,15},  4,{81,51,15}},   {  4,{50,22,14},  4,{51,23,14}},   {  3, {36,12,12},  8,{37,13,12}}},
+  {{  2,{116, 92,12},  2,{117, 93,12}},   {  6,{58,36,11},  2,{59,37,11}},   {  4,{46,20,13},  6,{47,21,13}},   {  7, {42,14,14},  4,{43,15,14}}},
+  {{  4,{133,107,13}                 },   {  8,{59,37,11},  1,{60,38,11}},   {  8,{44,20,12},  4,{45,21,12}},   { 12, {33,11,11},  4,{34,12,11}}},
+  {{  3,{145,115,15},  1,{146,116,15}},   {  4,{64,40,12},  5,{65,41,12}},   { 11,{36,16,10},  5,{37,17,10}},   { 11, {36,12,12},  5,{37,13,12}}},
+  {{  5,{109, 87,11},  1,{110, 88,11}},   {  5,{65,41,12},  5,{66,42,12}},   {  5,{54,24,15},  7,{55,25,15}},   { 11, {36,12,12},  7,{37,13,12}}},
+  {{  5,{122, 98,12},  1,{123, 99,12}},   {  7,{73,45,14},  3,{74,46,14}},   { 15,{43,19,12},  2,{44,20,12}},   {  3, {45,15,15}, 13,{46,16,15}}},
+  {{  1,{135,107,14},  5,{136,108,14}},   { 10,{74,46,14},  1,{75,47,14}},   {  1,{50,22,14}, 15,{51,23,14}},   {  2, {42,14,14}, 17,{43,15,14}}},
+  {{  5,{150,120,15},  1,{151,121,15}},   {  9,{69,43,13},  4,{70,44,13}},   { 17,{50,22,14},  1,{51,23,14}},   {  2, {42,14,14}, 19,{43,15,14}}},
+  {{  3,{141,113,14},  4,{142,114,14}},   {  3,{70,44,13}, 11,{71,45,13}},   { 17,{47,21,13},  4,{48,22,13}},   {  9, {39,13,13}, 16,{40,14,13}}},
+  {{  3,{135,107,14},  5,{136,108,14}},   {  3,{67,41,13}, 13,{68,42,13}},   { 15,{54,24,15},  5,{55,25,15}},   { 15, {43,15,14}, 10,{44,16,14}}},
+  {{  4,{144,116,14},  4,{145,117,14}},   { 17,{68,42,13}},                  { 17,{50,22,14},  6,{51,23,14}},   { 19, {46,16,15},  6,{47,17,15}}},
+  {{  2,{139,111,14},  7,{140,112,14}},   { 17,{74,46,14}},                  {  7,{54,24,15}, 16,{55,25,15}},   { 34, {37,13,12}               }},
+  {{  4,{151,121,15},  5,{152,122,15}},   {  4,{75,47,14}, 14,{76,48,14}},   { 11,{54,24,15}, 14,{55,25,15}},   { 16, {45,15,15}, 14,{46,16,15}}},
+  {{  6,{147,117,15},  4,{148,118,15}},   {  6,{73,45,14}, 14,{74,46,14}},   { 11,{54,24,15}, 16,{55,25,15}},   { 30, {46,16,15},  2,{47,17,15}}},
+  {{  8,{132,106,13},  4,{133,107,13}},   {  8,{75,47,14}, 13,{76,48,14}},   {  7,{54,24,15}, 22,{55,25,15}},   { 22, {45,15,15}, 13,{46,16,15}}},
+  {{ 10,{142,114,14},  2,{143,115,14}},   { 19,{74,46,14},  4,{75,47,14}},   { 28,{50,22,14},  6,{51,23,14}},   { 33, {46,16,15},  4,{47,17,15}}},
+  {{  8,{152,122,15},  4,{153,123,15}},   { 22,{73,45,14},  3,{74,46,14}},   {  8,{53,23,15}, 26,{54,24,15}},   { 12, {45,15,15}, 28,{46,16,15}}},
+  {{  3,{147,117,15}, 10,{148,118,15}},   {  3,{73,45,14}, 23,{74,46,14}},   {  4,{54,24,15}, 31,{55,25,15}},   { 11, {45,15,15}, 31,{46,16,15}}},
+  {{  7,{146,116,15},  7,{147,117,15}},   { 21,{73,45,14},  7,{74,46,14}},   {  1,{53,23,15}, 37,{54,24,15}},   { 19, {45,15,15}, 26,{46,16,15}}},
+  {{  5,{145,115,15}, 10,{146,116,15}},   { 19,{75,47,14}, 10,{76,48,14}},   { 15,{54,24,15}, 25,{55,25,15}},   { 23, {45,15,15}, 25,{46,16,15}}},
+  {{ 13,{145,115,15},  3,{146,116,15}},   {  2,{74,46,14}, 29,{75,47,14}},   { 42,{54,24,15},  1,{55,25,15}},   { 23, {45,15,15}, 28,{46,16,15}}},
+  {{ 17,{145,115,15}            	 },   { 10,{74,46,14}, 23,{75,47,14}},   { 10,{54,24,15}, 35,{55,25,15}},   { 19, {45,15,15}, 35,{46,16,15}}},
+  {{ 17,{145,115,15},  1,{146,116,15}},   { 14,{74,46,14}, 21,{75,47,14}},   { 29,{54,24,15}, 19,{55,25,15}},   { 11, {45,15,15}, 46,{46,16,15}}},
+  {{ 13,{145,115,15},  6,{146,116,15}},   { 14,{74,46,14}, 23,{75,47,14}},   { 44,{54,24,15},  7,{55,25,15}},   { 59, {46,16,15},  1,{47,17,15}}},
+  {{ 12,{151,121,15},  7,{152,122,15}},   { 12,{75,47,14}, 26,{76,48,14}},   { 39,{54,24,15}, 14,{55,25,15}},   { 22, {45,15,15}, 41,{46,16,15}}},
+  {{  6,{151,121,15}, 14,{152,122,15}},   {  6,{75,47,14}, 34,{76,48,14}},   { 46,{54,24,15}, 10,{55,25,15}},   {  2, {45,15,15}, 64,{46,16,15}}},
+  {{ 17,{152,122,15},  4,{153,123,15}},   { 29,{74,46,14}, 14,{75,47,14}},   { 49,{54,24,15}, 10,{55,25,15}},   { 24, {45,15,15}, 46,{46,16,15}}},
+  {{  4,{152,122,15}, 18,{153,123,15}},   { 13,{74,46,14}, 32,{75,47,14}},   { 48,{54,24,15}, 14,{55,25,15}},   { 42, {45,15,15}, 32,{46,16,15}}},
+  {{ 20,{147,117,15},  4,{148,118,15}},   { 40,{75,47,14},  7,{76,48,14}},   { 43,{54,24,15}, 22,{55,25,15}},   { 10, {45,15,15}, 67,{46,16,15}}},
+  {{ 19,{148,118,15},  6,{149,119,15}},   { 18,{75,47,14}, 31,{76,48,14}},   { 34,{54,24,15}, 34,{55,25,15}},   { 20, {45,15,15}, 61,{46,16,15}}}
+}
+local remainder = {0, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0}
+local function arrange_codewords_and_calculate_ec( version,ec_level,data )
+	if type(data)=="table" then
+		local tmp = ""
+		for i=1,#data do
+			tmp = tmp .. binary(data[i],8)
+		end
+		data = tmp
+	end
+	local blocks = ecblocks[version][ec_level]
+	local size_datablock_bytes, size_ecblock_bytes
+	local datablocks = {}
+	local final_ecblocks = {}
+	local count = 1
+	local pos = 0
+	local cpty_ec_bits = 0
+	for i=1,#blocks/2 do
+		for _=1,blocks[2*i - 1] do
+			size_datablock_bytes = blocks[2*i][2]
+			size_ecblock_bytes   = blocks[2*i][1] - blocks[2*i][2]
+			cpty_ec_bits = cpty_ec_bits + size_ecblock_bytes * 8
+			datablocks[#datablocks + 1] = string.sub(data, pos * 8 + 1,( pos + size_datablock_bytes)*8)
+			local tmp_tab = calculate_error_correction(datablocks[#datablocks],size_ecblock_bytes)
+			local tmp_str = ""
+			for x=1,#tmp_tab do
+				tmp_str = tmp_str .. binary(tmp_tab[x],8)
+			end
+			final_ecblocks[#final_ecblocks + 1] = tmp_str
+			pos = pos + size_datablock_bytes
+			count = count + 1
+		end
+	end
+	local arranged_data = ""
+	pos = 1
+	repeat
+		for i=1,#datablocks do
+			if pos < #datablocks[i] then
+				arranged_data = arranged_data .. string.sub(datablocks[i],pos, pos + 7)
+			end
+		end
+		pos = pos + 8
+	until #arranged_data == #data
+	local arranged_ec = ""
+	pos = 1
+	repeat
+		for i=1,#final_ecblocks do
+			if pos < #final_ecblocks[i] then
+				arranged_ec = arranged_ec .. string.sub(final_ecblocks[i],pos, pos + 7)
+			end
+		end
+		pos = pos + 8
+	until #arranged_ec == cpty_ec_bits
+	return arranged_data .. arranged_ec
+end
+local function add_position_detection_patterns(tab_x)
+	local size = #tab_x
+	for i=1,8 do
+		for j=1,8 do
+			tab_x[i][j] = -2
+			tab_x[size - 8 + i][j] = -2
+			tab_x[i][size - 8 + j] = -2
+		end
+	end
+	for i=1,7 do
+		tab_x[1][i]=2
+		tab_x[7][i]=2
+		tab_x[i][1]=2
+		tab_x[i][7]=2
+		tab_x[size][i]=2
+		tab_x[size - 6][i]=2
+		tab_x[size - i + 1][1]=2
+		tab_x[size - i + 1][7]=2
+		tab_x[1][size - i + 1]=2
+		tab_x[7][size - i + 1]=2
+		tab_x[i][size - 6]=2
+		tab_x[i][size]=2
+	end
+	for i=1,3 do
+		for j=1,3 do
+			tab_x[2+j][i+2]=2
+			tab_x[size - j - 1][i+2]=2
+			tab_x[2 + j][size - i - 1]=2
+		end
+	end
+end
+local function add_timing_pattern(tab_x)
+	local line,col
+	line = 7
+	col = 9
+	for i=col,#tab_x - 8 do
+		if math.fmod(i,2) == 1 then
+			tab_x[i][line] = 2
+		else
+			tab_x[i][line] = -2
+		end
+	end
+	for i=col,#tab_x - 8 do
+		if math.fmod(i,2) == 1 then
+			tab_x[line][i] = 2
+		else
+			tab_x[line][i] = -2
+		end
+	end
+end
+local alignment_pattern = {
+  {},{6,18},{6,22},{6,26},{6,30},{6,34}, -- 1-6
+  {6,22,38},{6,24,42},{6,26,46},{6,28,50},{6,30,54},{6,32,58},{6,34,62}, -- 7-13
+  {6,26,46,66},{6,26,48,70},{6,26,50,74},{6,30,54,78},{6,30,56,82},{6,30,58,86},{6,34,62,90}, -- 14-20
+  {6,28,50,72,94},{6,26,50,74,98},{6,30,54,78,102},{6,28,54,80,106},{6,32,58,84,110},{6,30,58,86,114},{6,34,62,90,118}, -- 21-27
+  {6,26,50,74,98 ,122},{6,30,54,78,102,126},{6,26,52,78,104,130},{6,30,56,82,108,134},{6,34,60,86,112,138},{6,30,58,86,114,142},{6,34,62,90,118,146}, -- 28-34
+  {6,30,54,78,102,126,150}, {6,24,50,76,102,128,154},{6,28,54,80,106,132,158},{6,32,58,84,110,136,162},{6,26,54,82,110,138,166},{6,30,58,86,114,142,170} -- 35 - 40
+}
+local function add_alignment_pattern( tab_x )
+	local version = (#tab_x - 17) / 4
+	local ap = alignment_pattern[version]
+	local pos_x, pos_y
+	for x=1,#ap do
+		for y=1,#ap do
+			if not (x == 1 and y == 1 or x == #ap and y == 1 or x == 1 and y == #ap ) then
+				pos_x = ap[x] + 1
+				pos_y = ap[y] + 1
+				tab_x[pos_x][pos_y] = 2
+				tab_x[pos_x+1][pos_y] = -2
+				tab_x[pos_x-1][pos_y] = -2
+				tab_x[pos_x+2][pos_y] =  2
+				tab_x[pos_x-2][pos_y] =  2
+				tab_x[pos_x  ][pos_y - 2] = 2
+				tab_x[pos_x+1][pos_y - 2] = 2
+				tab_x[pos_x-1][pos_y - 2] = 2
+				tab_x[pos_x+2][pos_y - 2] = 2
+				tab_x[pos_x-2][pos_y - 2] = 2
+				tab_x[pos_x  ][pos_y + 2] = 2
+				tab_x[pos_x+1][pos_y + 2] = 2
+				tab_x[pos_x-1][pos_y + 2] = 2
+				tab_x[pos_x+2][pos_y + 2] = 2
+				tab_x[pos_x-2][pos_y + 2] = 2
+				tab_x[pos_x  ][pos_y - 1] = -2
+				tab_x[pos_x+1][pos_y - 1] = -2
+				tab_x[pos_x-1][pos_y - 1] = -2
+				tab_x[pos_x+2][pos_y - 1] =  2
+				tab_x[pos_x-2][pos_y - 1] =  2
+				tab_x[pos_x  ][pos_y + 1] = -2
+				tab_x[pos_x+1][pos_y + 1] = -2
+				tab_x[pos_x-1][pos_y + 1] = -2
+				tab_x[pos_x+2][pos_y + 1] =  2
+				tab_x[pos_x-2][pos_y + 1] =  2
+			end
+		end
+	end
+end
+local typeinfo = {
+	{ [-1]= "111111111111111", [0] = "111011111000100", "111001011110011", "111110110101010", "111100010011101", "110011000101111", "110001100011000", "110110001000001", "110100101110110" },
+	{ [-1]= "111111111111111", [0] = "101010000010010", "101000100100101", "101111001111100", "101101101001011", "100010111111001", "100000011001110", "100111110010111", "100101010100000" },
+	{ [-1]= "111111111111111", [0] = "011010101011111", "011000001101000", "011111100110001", "011101000000110", "010010010110100", "010000110000011", "010111011011010", "010101111101101" },
+	{ [-1]= "111111111111111", [0] = "001011010001001", "001001110111110", "001110011100111", "001100111010000", "000011101100010", "000001001010101", "000110100001100", "000100000111011" }
+}
+local function add_typeinfo_to_matrix( matrix,ec_level,mask )
+	local ec_mask_type = typeinfo[ec_level][mask]
+	local bit
+	for i=1,7 do
+		bit = string.sub(ec_mask_type,i,i)
+		fill_matrix_position(matrix, bit, 9, #matrix - i + 1)
+	end
+	for i=8,9 do
+		bit = string.sub(ec_mask_type,i,i)
+		fill_matrix_position(matrix,bit,9,17-i)
+	end
+	for i=10,15 do
+		bit = string.sub(ec_mask_type,i,i)
+		fill_matrix_position(matrix,bit,9,16 - i)
+	end
+	for i=1,6 do
+		bit = string.sub(ec_mask_type,i,i)
+		fill_matrix_position(matrix,bit,i,9)
+	end
+	bit = string.sub(ec_mask_type,7,7)
+	fill_matrix_position(matrix,bit,8,9)
+	for i=8,15 do
+		bit = string.sub(ec_mask_type,i,i)
+		fill_matrix_position(matrix,bit,#matrix - 15 + i,9)
+	end
+end
+local version_information = {"001010010011111000", "001111011010000100", "100110010101100100", "110010110010010100",
+  "011011111101110100", "010001101110001100", "111000100001101100", "101100000110011100", "000101001001111100",
+  "000111101101000010", "101110100010100010", "111010000101010010", "010011001010110010", "011001011001001010",
+  "110000010110101010", "100100110001011010", "001101111110111010", "001000110111000110", "100001111000100110",
+  "110101011111010110", "011100010000110110", "010110000011001110", "111111001100101110", "101011101011011110",
+  "000010100100111110", "101010111001000001", "000011110110100001", "010111010001010001", "111110011110110001",
+  "110100001101001001", "011101000010101001", "001001100101011001", "100000101010111001", "100101100011000101" }
+local function add_version_information(matrix,version)
+	if version < 7 then return end
+	local size = #matrix
+	local bitstring = version_information[version - 6]
+	local x,y, bit
+	local start_x, start_y
+	start_x = size - 10
+	start_y = 1
+	for i=1,#bitstring do
+		bit = string.sub(bitstring,i,i)
+		x = start_x + math.fmod(i - 1,3)
+		y = start_y + math.floor( (i - 1) / 3 )
+		fill_matrix_position(matrix,bit,x,y)
+	end
+	start_x = 1
+	start_y = size - 10
+	for i=1,#bitstring do
+		bit = string.sub(bitstring,i,i)
+		x = start_x + math.floor( (i - 1) / 3 )
+		y = start_y + math.fmod(i - 1,3)
+		fill_matrix_position(matrix,bit,x,y)
+	end
+end
+local function prepare_matrix_with_mask( version,ec_level, mask )
+	local size
+	local tab_x = {}
+	size = version * 4 + 17
+	for i=1,size do
+		tab_x[i]={}
+		for j=1,size do
+			tab_x[i][j] = 0
+		end
+	end
+	add_position_detection_patterns(tab_x)
+	add_timing_pattern(tab_x)
+	add_version_information(tab_x,version)
+	tab_x[9][size - 7] = 2
+	add_alignment_pattern(tab_x)
+	add_typeinfo_to_matrix(tab_x,ec_level, mask)
+	return tab_x
+end
+local function get_pixel_with_mask( mask, x,y,value )
+	x = x - 1
+	y = y - 1
+	local invert = false
+	if mask == -1 then -- luacheck: ignore
+	elseif mask == 0 then
+		if math.fmod(x + y,2) == 0 then invert = true end
+	elseif mask == 1 then
+		if math.fmod(y,2) == 0 then invert = true end
+	elseif mask == 2 then
+		if math.fmod(x,3) == 0 then invert = true end
+	elseif mask == 3 then
+		if math.fmod(x + y,3) == 0 then invert = true end
+	elseif mask == 4 then
+		if math.fmod(math.floor(y / 2) + math.floor(x / 3),2) == 0 then invert = true end
+	elseif mask == 5 then
+		if math.fmod(x * y,2) + math.fmod(x * y,3) == 0 then invert = true end
+	elseif mask == 6 then
+		if math.fmod(math.fmod(x * y,2) + math.fmod(x * y,3),2) == 0 then invert = true end
+	elseif mask == 7 then
+		if math.fmod(math.fmod(x * y,3) + math.fmod(x + y,2),2) == 0 then invert = true end
+	else
+		assert(false,"This can't happen (mask must be <= 7)")
+	end
+	if invert then
+		return 1 - 2 * tonumber(value)
+	else
+		return -1 + 2*tonumber(value)
+	end
+end
+local function get_next_free_positions(matrix,x,y,dir,byte)
+	local ret = {}
+	local count = 1
+	local mode = "right"
+	while count <= #byte do
+		if mode == "right" and matrix[x][y] == 0 then
+			ret[#ret + 1] = {x,y}
+			mode = "left"
+			count = count + 1
+		elseif mode == "left" and matrix[x-1][y] == 0 then
+			ret[#ret + 1] = {x-1,y}
+			mode = "right"
+			count = count + 1
+			if dir == "up" then
+				y = y - 1
+			else
+				y = y + 1
+			end
+		elseif mode == "right" and matrix[x-1][y] == 0 then
+			ret[#ret + 1] = {x-1,y}
+			count = count + 1
+			if dir == "up" then
+				y = y - 1
+			else
+				y = y + 1
+			end
+		else
+			if dir == "up" then
+				y = y - 1
+			else
+				y = y + 1
+			end
+		end
+		if y < 1 or y > #matrix then
+			x = x - 2
+			if x == 7 then x = 6 end
+			if dir == "up" then
+				dir = "down"
+				y = 1
+			else
+				dir = "up"
+				y = #matrix
+			end
+		end
+	end
+	return ret,x,y,dir
+end
+local function add_data_to_matrix(matrix,data,mask)
+	local size = #matrix
+	local x,y,positions
+	local _x,_y,m
+	local dir = "up"
+	local byte_number = 0
+	x,y = size,size
+	string.gsub(data,".?.?.?.?.?.?.?.?",function ( byte )
+		byte_number = byte_number + 1
+		positions,x,y,dir = get_next_free_positions(matrix,x,y,dir,byte)
+		for i=1,#byte do
+			_x = positions[i][1]
+			_y = positions[i][2]
+			m = get_pixel_with_mask(mask,_x,_y,string.sub(byte,i,i))
+			if debugging then
+				matrix[_x][_y] = m * (i + 10)
+			else
+				matrix[_x][_y] = m
+			end
+		end
+	end)
+end
+local function calculate_penalty(matrix)
+	local penalty1, penalty2, penalty3 = 0,0,0
+	local size = #matrix
+	local number_of_dark_cells = 0
+	local last_bit_blank -- < 0:  blank, > 0: black
+	local is_blank
+	local number_of_consecutive_bits
+	for x=1,size do
+		number_of_consecutive_bits = 0
+		last_bit_blank = nil
+		for y = 1,size do
+			if matrix[x][y] > 0 then
+				number_of_dark_cells = number_of_dark_cells + 1
+				is_blank = false
+			else
+				is_blank = true
+			end
+			if last_bit_blank == is_blank then
+				number_of_consecutive_bits = number_of_consecutive_bits + 1
+			else
+				if number_of_consecutive_bits >= 5 then
+					penalty1 = penalty1 + number_of_consecutive_bits - 2
+				end
+				number_of_consecutive_bits = 1
+			end
+			last_bit_blank = is_blank
+		end
+		if number_of_consecutive_bits >= 5 then
+			penalty1 = penalty1 + number_of_consecutive_bits - 2
+		end
+	end
+	for y=1,size do
+		number_of_consecutive_bits = 0
+		last_bit_blank = nil
+		for x = 1,size do
+			is_blank = matrix[x][y] < 0
+			if last_bit_blank == is_blank then
+				number_of_consecutive_bits = number_of_consecutive_bits + 1
+			else
+				if number_of_consecutive_bits >= 5 then
+					penalty1 = penalty1 + number_of_consecutive_bits - 2
+				end
+				number_of_consecutive_bits = 1
+			end
+			last_bit_blank = is_blank
+		end
+		if number_of_consecutive_bits >= 5 then
+			penalty1 = penalty1 + number_of_consecutive_bits - 2
+		end
+	end
+	for x=1,size do
+		for y=1,size do
+			if (y < size - 1) and ( x < size - 1) and ( (matrix[x][y] < 0 and matrix[x+1][y] < 0 and matrix[x][y+1] < 0 and matrix[x+1][y+1] < 0) or (matrix[x][y] > 0 and matrix[x+1][y] > 0 and matrix[x][y+1] > 0 and matrix[x+1][y+1] > 0) ) then
+				penalty2 = penalty2 + 3
+			end
+			if (y + 6 < size and
+				matrix[x][y] > 0 and
+				matrix[x][y +  1] < 0 and
+				matrix[x][y +  2] > 0 and
+				matrix[x][y +  3] > 0 and
+				matrix[x][y +  4] > 0 and
+				matrix[x][y +  5] < 0 and
+				matrix[x][y +  6] > 0 and
+				((y + 10 < size and
+					matrix[x][y +  7] < 0 and
+					matrix[x][y +  8] < 0 and
+					matrix[x][y +  9] < 0 and
+					matrix[x][y + 10] < 0) or
+				 (y - 4 >= 1 and
+					matrix[x][y -  1] < 0 and
+					matrix[x][y -  2] < 0 and
+					matrix[x][y -  3] < 0 and
+					matrix[x][y -  4] < 0))) then penalty3 = penalty3 + 40 end
+			if (x + 6 <= size and
+				matrix[x][y] > 0 and
+				matrix[x +  1][y] < 0 and
+				matrix[x +  2][y] > 0 and
+				matrix[x +  3][y] > 0 and
+				matrix[x +  4][y] > 0 and
+				matrix[x +  5][y] < 0 and
+				matrix[x +  6][y] > 0 and
+				((x + 10 <= size and
+					matrix[x +  7][y] < 0 and
+					matrix[x +  8][y] < 0 and
+					matrix[x +  9][y] < 0 and
+					matrix[x + 10][y] < 0) or
+				 (x - 4 >= 1 and
+					matrix[x -  1][y] < 0 and
+					matrix[x -  2][y] < 0 and
+					matrix[x -  3][y] < 0 and
+					matrix[x -  4][y] < 0))) then penalty3 = penalty3 + 40 end
+		end
+	end
+	local dark_ratio = number_of_dark_cells / ( size * size )
+	local penalty4 = math.floor(math.abs(dark_ratio * 100 - 50)) * 2
+	return penalty1 + penalty2 + penalty3 + penalty4
+end
+local function get_matrix_and_penalty(version,ec_level,data,mask)
+	local tab = prepare_matrix_with_mask(version,ec_level,mask)
+	add_data_to_matrix(tab,data,mask)
+	local penalty = calculate_penalty(tab)
+	return tab, penalty
+end
+local function get_matrix_with_lowest_penalty(version,ec_level,data)
+	local tab, penalty
+	local tab_min_penalty, min_penalty
+	tab_min_penalty, min_penalty = get_matrix_and_penalty(version,ec_level,data,0)
+	for i=1,7 do
+		tab, penalty = get_matrix_and_penalty(version,ec_level,data,i)
+		if penalty < min_penalty then
+			tab_min_penalty = tab
+			min_penalty = penalty
+		end
+	end
+	return tab_min_penalty
+end
+local function qrcode( str, ec_level, _mode ) -- luacheck: no unused args
+	local arranged_data, version, data_raw, mode, len_bitstring
+	version, ec_level, data_raw, mode, len_bitstring = get_version_eclevel_mode_bistringlength(str,ec_level)
+	data_raw = data_raw .. len_bitstring
+	data_raw = data_raw .. encode_data(str,mode)
+	data_raw = add_pad_data(version,ec_level,data_raw)
+	arranged_data = arrange_codewords_and_calculate_ec(version,ec_level,data_raw)
+	if math.fmod(#arranged_data,8) ~= 0 then
+		return false, string.format("Arranged data %% 8 != 0: data length = %d, mod 8 = %d",#arranged_data, math.fmod(#arranged_data,8))
+	end
+	arranged_data = arranged_data .. string.rep("0",remainder[version])
+	local tab = get_matrix_with_lowest_penalty(version,ec_level,arranged_data)
+	return true, tab
+end
+if testing then
+	return {
+		encode_string_numeric = encode_string_numeric,
+		encode_string_ascii = encode_string_ascii,
+		qrcode = qrcode,
+		binary = binary,
+		get_mode = get_mode,
+		get_length = get_length,
+		add_pad_data = add_pad_data,
+		get_generator_polynominal_adjusted = get_generator_polynominal_adjusted,
+		get_pixel_with_mask = get_pixel_with_mask,
+		get_version_eclevel_mode_bistringlength = get_version_eclevel_mode_bistringlength,
+		remainder = remainder,
+		arrange_codewords_and_calculate_ec = arrange_codewords_and_calculate_ec,
+		calculate_error_correction = calculate_error_correction,
+		convert_bitstring_to_bytes = convert_bitstring_to_bytes,
+		bit_xor = bit_xor,
+	}
+end
+return qrcode
+end
+
 -- file:[./files/libs/png_decode.lua]
 
 function png_decode_wrapper()
@@ -4399,7 +5732,8 @@ end
 
 library = library or {}
 library.log30 = log30_wrapper()
-library.Stream = stream_wrapper()
 library.deflate = deflate_wrapper()
+library.Stream = stream_wrapper()
+library.qrcode = qrcode_wrapper()
 library.pngEncode = png_encode_wrapper()
 library.pngDecode = png_decode_wrapper()
