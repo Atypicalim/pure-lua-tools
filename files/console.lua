@@ -150,7 +150,6 @@ function console.print_qrcode(content)
     print("|")
     local isOk, datas = library.qrcode(content)
     assert(isOk == true, 'qrcode generate failed!')
-    local data = {}
     for i,column in ipairs(datas) do
         if i ~= 1 then
             io.write('\n')

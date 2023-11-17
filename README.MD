@@ -345,6 +345,7 @@ print(time:countDay())
 
 18. library
 
+* image
 ```lua
 -- write png
 local img = library.pngEncode(4, 4, "rgba")
@@ -358,6 +359,38 @@ local img = library.pngDecode(data, printProg)
 local pixel = img:getPixel(2, 2)
 print("size:", img.width, img.height, "depth:", img.depth, "color:", img.colorType)
 print("pixel:", pixel.R, pixel.G, pixel.B, pixel.A)
+```
+
+* log30
+```lua
+local Parent = library.log30()
+function Parent:__init()
+    print('parent init ...')
+end
+function Parent:testFunc()
+    print('test func ...')
+end
+local Child = Parent:extends()
+function Child:__init()
+	self.super.__init(self)
+    print('child init ...')
+end
+local object = Child()
+object:testFunc()
+-- parent init ...
+-- child init ...
+-- test func ...
+```
+
+* qrcode
+```lua
+local isOk, datas = library.qrcode("content...")
+assert(isOk == true, 'qrcode generate failed!')
+for i,column in ipairs(datas) do
+    for j,row in ipairs(column) do
+        --
+    end
+end
 ```
 
 18. Canvas
@@ -602,6 +635,7 @@ print('content:', content)
 -- * quitted!
 -- content:  edited content ...
 ```
+![log_test](./others/test_qrcode.jpg)
 
 ---
 
