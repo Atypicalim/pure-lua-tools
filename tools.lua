@@ -1,5 +1,5 @@
 
--- tools:[2023-11-17_19:42:48]
+-- tools:[2023-11-24_19:15:57]
 
 -- file:[./files/lua.lua]
 
@@ -114,6 +114,20 @@ function lua_get_pointer(v)
     else
         return nil
     end
+end
+function lua_set_debug(enable)
+    rawset(_G, 'lua-is-debug', enable == true)
+end
+function lua_is_debug()
+    return rawget(_G, 'lua-is-debug') == true
+end
+function lua_set_user(user)
+    assert(#user >= 3, 'invalid user format')
+    assert(string.match(user, '%w+'), 'invalid user format')
+    rawset(_G, 'lua-user-name', user)
+end
+function lua_get_user()
+    return rawget(_G, 'lua-user-name') or 'unknown'
 end
 function lua_script_path(level)
     level = level or 0
@@ -1242,89 +1256,110 @@ end
 assert(Path == nil)
 Path = class("Path")
 function Path:__init__(value)
-    self._stack = {}
-    self:set(value)
+    self._stack = table.new()
+    if value then
+        self:set(value)
+    end
 end
-function Path:set(value)
-    if value == "~" then
-        value = os.getenv('HOME') or os.getenv('USERPROFILE')
-    elseif value == "." then
-        local cwd = io.popen"cd":read'*l'
-        value = Path(cwd):get()
-    elseif value == "/" or value == "\\" then
-        local cwd = io.popen"cd":read'*l'
-        value = Path(cwd)._stack[1]
-    end
-    value = value or ""
-    value = value:gsub("\\+", "/"):gsub("/+", "/")
-    value = value:trim():trim("/"):trim()
-    self._stack = {}
-    local arr = string.explode(value, "/")
-    for i,v in ipairs(arr) do
-        table.insert(self._stack, v)
-    end
-    return self
-end
-function Path:get(isCalculate, delimiter)
-    isCalculate = isCalculate == true
-    delimiter = delimiter or string.find(os.tmpname(""), "\\") and "\\" or "/"
-    local stack = {}
-    local value = ""
-    for i,v in ipairs(self._stack) do
-        if isCalculate and v == ".." then
-            table.remove(stack, #stack)
-        elseif isCalculate and v == "." then
-            if #stack == 0 then
-                table.insert(stack, v)
-            end
-        else
-            table.insert(stack, v)
-        end
-    end
-    for i,v in ipairs(stack) do
-        value = i == 1 and v or value .. delimiter .. v
+function Path:_parse(value)
+    if value:starts("~") then
+        value = files.home() .. "/" .. value:sub(2, -1)
+    elseif value == "." or value:starts("./") then
+        value = files.cwd() .. "/" .. value:sub(2, -1)
+    elseif value == ".." or value:starts("../") then
+        value = files.cwd() .. "/../" .. value:sub(3, -1)
+    elseif value:starts("/") then
+        value = files.root() .. "/" .. value:sub(2, -1)
     end
     return value
 end
+function Path:_explode(value)
+    return files.unixify(value):trim("/"):explode("/")
+end
+function Path:_implode(stack)
+    return table.implode(stack, "/")
+end
+function Path:_validate()
+    local size = #self._stack
+    local count = 0
+    for i=size,1,-1 do
+        local item = self._stack[i]
+        if i == 1 then
+            break
+        elseif item == "" then
+            table.remove(self._stack, i)
+        elseif item == "." then
+            table.remove(self._stack, i)
+        elseif item == ".." then
+            count = count + 1
+            table.remove(self._stack, i)
+        elseif count > 0 then
+            count = count - 1
+            table.remove(self._stack, i)
+        end
+        assert(count >= 0, 'invalid path validate')
+    end
+end
+function Path:cd(value)
+    value = files.unixify(value)
+    if not string.valid(value) then
+        return self
+    end
+    if #self._stack == 0 or value:starts("~") or value:starts("/") then
+        value = self:_parse(value)
+        self._stack = self:_explode(value)
+    else
+        self:push(value)
+    end
+    self:_validate()
+    return self
+end
+function Path:set(value)
+    value = files.unixify(value)
+    assert(string.valid(value), 'invalid path value')
+    value = self:_parse(value)
+    self._stack = self:_explode(value)
+    self:_validate()
+    return self
+end
+function Path:get()
+    return self:_implode(self._stack)
+end
 function Path:push(...)
     local values = {...}
-    local value = ""
-    for i,v in ipairs(values) do
-        value = value .. "/" .. v
+    for i,value in ipairs(values) do
+        value = files.unixify(value)
+        assert(string.valid(value), 'invalid path value')
+        local stack = self:_explode(value)
+        self._stack:append(stack)
     end
-    return self:append(Path(value))
+    self:_validate()
+    return self
 end
-function Path:pop(depth)
-    depth = depth or 1
-    for i=1,depth do
+function Path:pop(count)
+    count = count or 1
+    for i=1,count do
         table.remove(self._stack, #self._stack)
     end
+    self:_validate()
     return self
 end
 function Path:equal(other)
     assert(type(other) == "table")
     return self:get() == other:get()
 end
-function Path:append(other)
-    assert(type(other) == "table")
-    for i,v in ipairs(other._stack) do
-        table.insert(self._stack, v)
-    end
-    return self
-end
 function Path:relative(other)
-    local value1 = self:get(true)
-    local value2 = other:get(true)
-    local stack1 = Path(value1)._stack
-    local stack2 = Path(value2)._stack
-    local diff = ""
-    for i=1,math.max(#stack1, #stack2) do
-        local v1 = stack1[i]
-        local v2 = stack2[i]
+    if self._stack[1] ~= other._stack[1] then
+        return
+    end
+    local max = math.max(#self._stack, #other._stack)
+    local diff = "./"
+    for i=1,max do
+        local v1 = self._stack[i]
+        local v2 = other._stack[i]
         if v1 ~= nil and v2 ~= nil then
-            if v1 == v2 then
-            else
-                diff =   diff .. "/../" .. v2
+            if v1 ~= v2 then
+                diff = diff .. "../" .. v2
             end
         elseif v1 and not v2 then
             diff = ".." .. "/" .. diff
@@ -1332,10 +1367,35 @@ function Path:relative(other)
             diff =  diff .. "/" .. v2
         end
     end
+    print(diff)
     return Path(diff)
+end
+function Path:clone()
+    local oldPath = self:get()
+    local objPath = Path(oldPath)
+    local newPath = objPath:get()
+    assert(oldPath == newPath, 'buggy path operation')
+    return objPath
 end
 function Path:root()
     return self:pop(#self._stack - 1)
+end
+function Path:size()
+    return #self._stack
+end
+function Path:isRoot()
+    return #self._stack == 1
+end
+function Path:isFile()
+    local last = self._stack[#self._stack]
+    return last ~= nil and string.match(last, '%.%w+$')
+end
+function Path:getDir()
+    local stack = table.copy(self._stack)
+    if self:isFile() then
+        table.remove(stack, #stack)
+    end
+    return self:_implode(self._stack)
 end
 
 -- file:[./files/files.lua]
@@ -1347,14 +1407,50 @@ function files.delimiter()
     delimiter = string.find(os.tmpname(""), "\\") and "\\" or "/"
     return delimiter
 end
-function files.home()
-    return os.getenv('HOME') or os.getenv('USERPROFILE')
+function files.unixify(path)
+    return path:gsub("\\+", "/"):gsub("/+", "/"):trim()
 end
-function files.temp(name, ext)
-    name = name or "file"
+function files.home()
+    local home = os.getenv('HOME') or os.getenv('USERPROFILE')
+    return files.unixify(home)
+end
+function files.root()
+    local cwd = files.cwd()
+    return files.unixify(cwd):explode("/")[1]
+end
+function files.user()
+    local path = string.format("%s/.%s/", files.home(), lua_get_user())
+    files.mk_folder(path)
+    return path
+end
+function files.temp()
+    local path = files.user() .. "/my-lua-tmp/"
+    files.mk_folder(path)
+    return path
+end
+function files.temp_file(name, ext)
+    name = name or "unknown"
     ext = ext or "txt"
-    local flag = os.tmpname():sub(2, -2)
-    return string.format("%s/tmp_%s_%s.%s", files.home(), flag, name, ext)
+    local dateText = os.date("%Y-%m-%d_%H-%M-%S", os.time())
+    local tempName = os.tmpname():sub(2, -1)
+    local tempFldr = files.temp()
+    files.mk_folder(tempFldr)
+    if string.ends(tempName, ".") then
+        tempName = tempName .. "0"
+    end
+    return string.format("%s/%s_%s_%s.%s", tempFldr, name, dateText, tempName, ext)
+end
+function files.temp_clear(name)
+    local tempFldr = files.temp()
+    local list = files.list(tempFldr)
+    local count = 0
+    for i,path in ipairs(list) do
+        if string.find(path, name) then
+            files.delete(tempFldr .. "/" .. path)
+            count = count + 1
+        end
+    end
+    return count > 0
 end
 local cwd = nil
 function files.cwd()
@@ -1367,7 +1463,7 @@ function files.cwd()
     end
     assert(isOk and output ~= nil)
     cwd = output:trim():slash() .. '/'
-    return cwd
+    return files.unixify(cwd)
 end
 function files.csd(thread)
     local info = debug.getinfo(thread or 2)
@@ -1375,7 +1471,8 @@ function files.csd(thread)
     local path = info.short_src
     assert(path ~= nil)
     path = path:trim():slash()
-    return files.cwd() .. files.get_folder(path) .. '/'
+    local csd = files.cwd() .. files.get_folder(path) .. '/'
+    return files.unixify(csd)
 end
 function files.absolute(this)
     return files.cwd() .. this
@@ -1813,6 +1910,25 @@ function encryption.base64_decode(data)
         for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(8-i) or 0) end
         return string.char(c)
     end))
+end
+local function bxor_transform(key, text)
+    assert(string.valid(key))
+    assert(is_string(key))
+    local encrypted = ""
+    local keyLength = #key
+    for i = 1, #text do
+        local origin = string.byte(text, i)
+        local salt = string.byte(key, (i - 1) % keyLength + 1)
+        local encoded = bit.bxor(origin, salt)
+        encrypted = encrypted .. string.char(encoded)
+    end
+    return encrypted
+end
+function encryption.bxor_encode(key, text)
+    return bxor_transform(key, text)
+end
+function encryption.bxor_decode(key, text)
+    return bxor_transform(key, text)
 end
 
 -- file:[./files/time.lua]
@@ -2500,7 +2616,7 @@ function console.print_edit(_content)
         if input == "E" or input == "EDIT" then
             console.delete_line(1)
             print('* editing:')
-            local path = files.temp()
+            local path = files.temp_file()
             files.write(path, content)
             tools.edit_file(path)
             content = files.read(path) or content
@@ -2552,6 +2668,24 @@ function console.clean_screen(replacement, noWrap)
     text = text .. (noWrap and "" or "\n")
     text = "\027[2J\027[1;1H" .. text
     io.write(text)
+end
+
+-- file:[./files/shell.lua]
+
+shell = shell or {}
+local smt = {}
+setmetatable(shell, smt)
+local function shell_execute(cmd, ...)
+    for _, v in ipairs({...}) do
+        cmd = cmd .. ' ' .. v
+    end
+    local isOk, out = tools.execute(cmd)
+    return isOk, out
+end
+smt.__index = function(t, cmd)
+	return function(...)
+        return shell_execute(cmd, ...)
+	end
 end
 
 -- file:[./files/Point.lua]

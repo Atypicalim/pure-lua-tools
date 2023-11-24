@@ -269,7 +269,7 @@ function console.print_edit(_content)
         if input == "E" or input == "EDIT" then
             console.delete_line(1)
             print('* editing:')
-            local path = files.temp()
+            local path = files.temp_file()
             files.write(path, content)
             tools.edit_file(path)
             content = files.read(path) or content

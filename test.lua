@@ -27,6 +27,7 @@ local orders = {
     "package",
     "tools",
     "console",
+    "shell",
     "Point",
     "Object",
     "Events",

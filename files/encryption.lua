@@ -231,3 +231,25 @@ function encryption.base64_decode(data)
         return string.char(c)
     end))
 end
+
+local function bxor_transform(key, text)
+    assert(string.valid(key))
+    assert(is_string(key))
+    local encrypted = ""
+    local keyLength = #key
+    for i = 1, #text do
+        local origin = string.byte(text, i)
+        local salt = string.byte(key, (i - 1) % keyLength + 1)
+        local encoded = bit.bxor(origin, salt)
+        encrypted = encrypted .. string.char(encoded)
+    end
+    return encrypted
+end
+
+function encryption.bxor_encode(key, text)
+    return bxor_transform(key, text)
+end
+
+function encryption.bxor_decode(key, text)
+    return bxor_transform(key, text)
+end

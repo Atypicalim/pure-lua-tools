@@ -127,6 +127,24 @@ function lua_get_pointer(v)
     end
 end
 
+function lua_set_debug(enable)
+    rawset(_G, 'lua-is-debug', enable == true)
+end
+
+function lua_is_debug()
+    return rawget(_G, 'lua-is-debug') == true
+end
+
+function lua_set_user(user)
+    assert(#user >= 3, 'invalid user format')
+    assert(string.match(user, '%w+'), 'invalid user format')
+    rawset(_G, 'lua-user-name', user)
+end
+
+function lua_get_user()
+    return rawget(_G, 'lua-user-name') or 'unknown'
+end
+
 function lua_script_path(level)
     level = level or 0
     local info = debug.getinfo(2 + level, "S")

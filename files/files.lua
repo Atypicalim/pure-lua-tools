@@ -11,15 +11,56 @@ function files.delimiter()
     return delimiter
 end
 
-function files.home()
-    return os.getenv('HOME') or os.getenv('USERPROFILE')
+function files.unixify(path)
+    return path:gsub("\\+", "/"):gsub("/+", "/"):trim()
 end
 
-function files.temp(name, ext)
-    name = name or "file"
+function files.home()
+    local home = os.getenv('HOME') or os.getenv('USERPROFILE')
+    return files.unixify(home)
+end
+
+function files.root()
+    local cwd = files.cwd()
+    return files.unixify(cwd):explode("/")[1]
+end
+
+function files.user()
+    local path = string.format("%s/.%s/", files.home(), lua_get_user())
+    files.mk_folder(path)
+    return path
+end
+
+function files.temp()
+    local path = files.user() .. "/my-lua-tmp/"
+    files.mk_folder(path)
+    return path
+end
+
+function files.temp_file(name, ext)
+    name = name or "unknown"
     ext = ext or "txt"
-    local flag = os.tmpname():sub(2, -2)
-    return string.format("%s/tmp_%s_%s.%s", files.home(), flag, name, ext)
+    local dateText = os.date("%Y-%m-%d_%H-%M-%S", os.time())
+    local tempName = os.tmpname():sub(2, -1)
+    local tempFldr = files.temp()
+    files.mk_folder(tempFldr)
+    if string.ends(tempName, ".") then
+        tempName = tempName .. "0"
+    end
+    return string.format("%s/%s_%s_%s.%s", tempFldr, name, dateText, tempName, ext)
+end
+
+function files.temp_clear(name)
+    local tempFldr = files.temp()
+    local list = files.list(tempFldr)
+    local count = 0
+    for i,path in ipairs(list) do
+        if string.find(path, name) then
+            files.delete(tempFldr .. "/" .. path)
+            count = count + 1
+        end
+    end
+    return count > 0
 end
 
 -- current working directory
@@ -34,7 +75,7 @@ function files.cwd()
     end
     assert(isOk and output ~= nil)
     cwd = output:trim():slash() .. '/'
-    return cwd
+    return files.unixify(cwd)
 end
 
 -- current script directory
@@ -44,7 +85,8 @@ function files.csd(thread)
     local path = info.short_src
     assert(path ~= nil)
     path = path:trim():slash()
-    return files.cwd() .. files.get_folder(path) .. '/'
+    local csd = files.cwd() .. files.get_folder(path) .. '/'
+    return files.unixify(csd)
 end
 
 function files.absolute(this)
