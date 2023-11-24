@@ -636,6 +636,14 @@ print('content:', content)
 ```
 ![log_test](./others/test_qrcode.png)
 
+25. shell
+
+```lua
+local isOk, output = shell.whoami()
+print(isOk, output)
+-- true  win\administrator
+```
+
 ---
 
 > for more feture plz read the source code ...
