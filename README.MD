@@ -200,7 +200,21 @@ r = bit.bnot(1) -- -2
 
 9. encryption
 ```lua
-encryption.md5('hello') -- 5d41402abc4b2a76b9719d911017c592
+local text = "hello"
+local md5 = encryption.md5(text)
+print(md5)
+-- 5d41402abc4b2a76b9719d911017c592
+local encoded = encryption.base64_encode(text)
+print(encoded)
+-- aGVsbG8=
+local decoded = encryption.base64_decode(encoded)
+print(decoded)
+-- hello
+local key = "key"
+local encoded = encryption.bxor_encode(key, text)
+local decoded = encryption.bxor_encode(key, encoded)
+print(decoded)
+-- hello
 ```
 
 10. http
