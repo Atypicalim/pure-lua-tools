@@ -47,7 +47,7 @@ function table.merge(this, that)
 end
 
 function table.sub(this, from, to)
-    assert(is_array(sub))
+    assert(is_array(this))
     local ret = {}
     local len = #this
     from = from or 1
@@ -368,6 +368,42 @@ function table.foreach(this, func)
             end
         end
     end
+end
+
+function table.map(this, func)
+    local ret = {}
+    table.foreach(this, function(k, v)
+        local r = func(k,v)
+        if r then
+            if is_array(this) then
+                table.insert(ret, r)
+            else
+                ret[k] = r
+            end
+        end
+    end)
+    return ret
+end
+
+function table.reduce(this, func, accumulator)
+    if not is_function(func) and is_function(accumulator) then
+        local temp = func
+        func = accumulator
+        accumulator = temp
+    end
+    table.foreach(this, function(k, v)
+        if not accumulator then
+            if is_number(v) then
+                accumulator = 0
+            elseif is_string(v) then
+                accumulator = ""
+            elseif is_table(v) then
+                accumulator = {}
+            end
+        end
+        accumulator = func(accumulator, v)
+    end)
+    return accumulator
 end
 
 function table.reverse(this)
