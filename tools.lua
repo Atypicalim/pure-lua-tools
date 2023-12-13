@@ -1,5 +1,5 @@
 
--- tools:[2023-11-24_19:15:57]
+-- tools:[2023-12-13_23:07:17]
 
 -- file:[./files/lua.lua]
 
@@ -439,7 +439,7 @@ function table.merge(this, that)
     return this
 end
 function table.sub(this, from, to)
-    assert(is_array(sub))
+    assert(is_array(this))
     local ret = {}
     local len = #this
     from = from or 1
@@ -733,6 +733,40 @@ function table.foreach(this, func)
             end
         end
     end
+end
+function table.map(this, func)
+    local ret = {}
+    table.foreach(this, function(k, v)
+        local r = func(k,v)
+        if r then
+            if is_array(this) then
+                table.insert(ret, r)
+            else
+                ret[k] = r
+            end
+        end
+    end)
+    return ret
+end
+function table.reduce(this, func, accumulator)
+    if not is_function(func) and is_function(accumulator) then
+        local temp = func
+        func = accumulator
+        accumulator = temp
+    end
+    table.foreach(this, function(k, v)
+        if not accumulator then
+            if is_number(v) then
+                accumulator = 0
+            elseif is_string(v) then
+                accumulator = ""
+            elseif is_table(v) then
+                accumulator = {}
+            end
+        end
+        accumulator = func(accumulator, v)
+    end)
+    return accumulator
 end
 function table.reverse(this)
     local ret = {}
@@ -1465,17 +1499,21 @@ function files.cwd()
     cwd = output:trim():slash() .. '/'
     return files.unixify(cwd)
 end
-function files.csd(thread)
+function files.csd(thread, isDebug)
     local info = debug.getinfo(thread or 2)
     if not info then return end
     local path = info.short_src
     assert(path ~= nil)
     path = path:trim():slash()
-    local csd = files.cwd() .. files.get_folder(path) .. '/'
+    local folder = files.get_folder(path)
+    local csd = files.absolute(folder)
     return files.unixify(csd)
 end
 function files.absolute(this)
-    return files.cwd() .. this
+    if string.match(this, "^/") or string.match(this, "^%a:") then
+        return this
+    end
+    return files.cwd() .. this .. "/"
 end
 function files.relative(this)
     return this:gsub(files.cwd(), '')

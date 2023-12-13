@@ -79,18 +79,22 @@ function files.cwd()
 end
 
 -- current script directory
-function files.csd(thread)
+function files.csd(thread, isDebug)
     local info = debug.getinfo(thread or 2)
     if not info then return end
     local path = info.short_src
     assert(path ~= nil)
     path = path:trim():slash()
-    local csd = files.cwd() .. files.get_folder(path) .. '/'
+    local folder = files.get_folder(path)
+    local csd = files.absolute(folder)
     return files.unixify(csd)
 end
 
 function files.absolute(this)
-    return files.cwd() .. this
+    if string.match(this, "^/") or string.match(this, "^%a:") then
+        return this
+    end
+    return files.cwd() .. this .. "/"
 end
 
 function files.relative(this)
