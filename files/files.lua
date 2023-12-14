@@ -79,10 +79,10 @@ function files.cwd()
 end
 
 -- current script directory
-function files.csd(thread, isDebug)
+function files.csd(thread)
     local info = debug.getinfo(thread or 2)
     if not info then return end
-    local path = info.short_src
+    local path = info.source:sub(2, -1)
     assert(path ~= nil)
     path = path:trim():slash()
     local folder = files.get_folder(path)

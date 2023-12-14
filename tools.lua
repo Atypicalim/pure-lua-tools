@@ -1,5 +1,5 @@
 
--- tools:[2023-12-13_23:07:17]
+-- tools:[2023-12-14_21:16:28]
 
 -- file:[./files/lua.lua]
 
@@ -1499,10 +1499,10 @@ function files.cwd()
     cwd = output:trim():slash() .. '/'
     return files.unixify(cwd)
 end
-function files.csd(thread, isDebug)
+function files.csd(thread)
     local info = debug.getinfo(thread or 2)
     if not info then return end
-    local path = info.short_src
+    local path = info.source:sub(2, -1)
     assert(path ~= nil)
     path = path:trim():slash()
     local folder = files.get_folder(path)
