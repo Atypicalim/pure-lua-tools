@@ -1,5 +1,5 @@
 
--- tools:[2023-12-14_21:16:28]
+-- tools:[2024-04-10_23:05:40]
 
 -- file:[./files/lua.lua]
 
@@ -1422,14 +1422,23 @@ function Path:isRoot()
 end
 function Path:isFile()
     local last = self._stack[#self._stack]
-    return last ~= nil and string.match(last, '%.%w+$')
+    return last ~= nil and string.match(last, '%.%w+$') ~= nil
 end
 function Path:getDir()
     local stack = table.copy(self._stack)
     if self:isFile() then
         table.remove(stack, #stack)
     end
-    return self:_implode(self._stack)
+    return self:_implode(stack)
+end
+function Path:getNameWithExt()
+    if self:isFile() then
+        local nameWithExe = self._stack[#self._stack]
+        local arr = files.unixify(nameWithExe):trim():explode("%.")
+        local nam = arr[1]
+        local ext = arr[2]
+        return nameWithExe, nam, ext
+    end
 end
 
 -- file:[./files/files.lua]
