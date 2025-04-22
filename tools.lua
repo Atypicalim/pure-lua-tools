@@ -1,5 +1,5 @@
 
--- tools:[2024-04-10_23:05:40]
+-- tools:[2025-04-22_21:37:51]
 
 -- file:[./files/lua.lua]
 
@@ -556,26 +556,30 @@ local function convert_value(value, isEcho)
         return tostring(value)
     end
 end
-function table.string(this, blank, keys, isEcho, withHidden, _storey)
+function table.string(this, blank, keys, isEcho, withHidden, arrKeyless, _storey)
     assert(is_table(this))
     _storey = _storey or 1
     local result = table.new()
     blank = blank or "    "
-    local function try_convert(k, v)
+    local function try_convert(k, v, ignoreKey)
         local valid = withHidden or not string.starts(k, "__")
         local key = convert_key(k, isEcho)
         local value = nil
         if is_table(v) then
-            value = table.string(v, blank, keys, isEcho, withHidden, _storey + 1)
+            value = table.string(v, blank, keys, isEcho, withHidden, arrKeyless, _storey + 1)
         else
             value = convert_value(v, isEcho)
         end
         if valid and key and value then
-            result:insert(blank:rep(_storey) .. key .. " = " .. value)
+            if ignoreKey then
+                result:insert(blank:rep(_storey) .. value)
+            else
+                result:insert(blank:rep(_storey) .. key .. " = " .. value)
+            end
         end
     end
     if table.is_array(this) then
-        for i,v in ipairs(this) do try_convert(i, v) end
+        for i,v in ipairs(this) do try_convert(i, v, arrKeyless) end
     elseif keys then
         for i,k in ipairs(keys) do
             local v = this[k]
@@ -594,7 +598,7 @@ function table.string(this, blank, keys, isEcho, withHidden, _storey)
     return string.new("{" .. content .. "}")
 end
 function table.printable(this, blank, keys)
-    return  table.string(this, blank, keys, true)
+    return table.string(this, blank, keys, nil, true)
 end
 function table.encode(this)
     assert(is_table(this))
