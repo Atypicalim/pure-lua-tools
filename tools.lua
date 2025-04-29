@@ -1,5 +1,5 @@
 
--- tools:[2025-04-22_21:37:51]
+-- tools:[2025-04-29_20:08:27]
 
 -- file:[./files/lua.lua]
 
@@ -556,9 +556,11 @@ local function convert_value(value, isEcho)
         return tostring(value)
     end
 end
-function table.string(this, blank, keys, isEcho, withHidden, arrKeyless, _storey)
+function table.string(this, blank, keys, isEcho, withHidden, arrKeyless, _storey, _record)
     assert(is_table(this))
     _storey = _storey or 1
+    _record = _record or {}
+    _record[this] = true
     local result = table.new()
     blank = blank or "    "
     local function try_convert(k, v, ignoreKey)
@@ -566,7 +568,11 @@ function table.string(this, blank, keys, isEcho, withHidden, arrKeyless, _storey
         local key = convert_key(k, isEcho)
         local value = nil
         if is_table(v) then
-            value = table.string(v, blank, keys, isEcho, withHidden, arrKeyless, _storey + 1)
+            if _record[v] then
+                value = tostring(v)
+            else
+                value = table.string(v, blank, keys, isEcho, withHidden, arrKeyless, _storey + 1, _record)
+            end
         else
             value = convert_value(v, isEcho)
         end

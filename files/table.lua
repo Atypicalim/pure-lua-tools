@@ -176,19 +176,23 @@ local function convert_value(value, isEcho)
     end
 end
 
-function table.string(this, blank, keys, isEcho, withHidden, arrKeyless, _storey)
-    --
+function table.string(this, blank, keys, isEcho, withHidden, arrKeyless, _storey, _record)
     assert(is_table(this))
     _storey = _storey or 1
+    _record = _record or {}
+    _record[this] = true
     local result = table.new()
     blank = blank or "    "
-    --
     local function try_convert(k, v, ignoreKey)
         local valid = withHidden or not string.starts(k, "__")
         local key = convert_key(k, isEcho)
         local value = nil
         if is_table(v) then
-            value = table.string(v, blank, keys, isEcho, withHidden, arrKeyless, _storey + 1)
+            if _record[v] then
+                value = tostring(v)
+            else
+                value = table.string(v, blank, keys, isEcho, withHidden, arrKeyless, _storey + 1, _record)
+            end
         else
             value = convert_value(v, isEcho)
         end
@@ -200,7 +204,6 @@ function table.string(this, blank, keys, isEcho, withHidden, arrKeyless, _storey
             end
         end
     end
-    --
     if table.is_array(this) then
         for i,v in ipairs(this) do try_convert(i, v, arrKeyless) end
     elseif keys then
