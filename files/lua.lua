@@ -221,33 +221,37 @@ function lua_new_decorator(func)
     return decorator
 end
 
-function lua_set_delegate(obj, delegation)
-    obj.__delegation = delegation
-    if obj.__delegated then
+local function __lua_delegate_func(t, k)
+    local v = rawget(t, k)
+    if v ~= nil then
         return
     end
-    local _oldMt = getmetatable(obj)
-    obj.__delegated = true
-    local function index(t, k)
-        local v = rawget(t, k)
-        if v == nil and _oldMt ~= nil and _oldMt.__index ~= nil then
-            v = _oldMt.__index[k]
-        end
-        if v ~= nil then
-            return v
-        end
-        if is_function(obj.__delegation) then
-            v = function(...) return obj.__delegation(k, ...) end
-        elseif is_userdata(obj.__delegation) then
-            local _obj = obj.__delegation
-            if is_function(_obj[k]) then
-                v = function(_t, ...) return _obj[k](_obj, ...) end
-            else
-                v = _obj[k]
-            end
-        end
+    local _meta = rawget(t, "__delegated")
+    local _dlgt = rawget(t, "__delegation")
+    if _meta ~= nil and _meta.__index ~= nil and _meta.__index ~= __lua_delegate_func then
+        v = _meta.__index[k]
+    end
+    if v ~= nil then
         return v
     end
-    setmetatable(obj, {__index = index})
+    -- 
+    if is_function(_dlgt) then
+        v = function(...) return _dlgt(k, ...) end
+    elseif is_userdata(_dlgt) then
+        if is_function(_dlgt[k]) then
+            v = function(_t, ...) return _dlgt[k](_dlgt, ...) end
+        else
+            v = _dlgt[k]
+        end
+    end
+    return v
+end
+
+function lua_set_delegate(obj, delegation)
+    rawset(obj, '__delegation', delegation)
+    if rawget(obj, '__delegated') ~= nil or delegation == nil then return end
+    local _meta = getmetatable(obj)
+    rawset(obj, '__delegated', _meta)
+    setmetatable(obj, {__index = __lua_delegate_func})
 end
 
