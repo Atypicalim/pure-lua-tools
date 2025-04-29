@@ -4,6 +4,10 @@ function null()
     return null
 end
 
+function is_userdata(v)
+    return type(v) == 'userdata'
+end
+
 function is_table(v)
     return type(v) == 'table'
 end
@@ -217,8 +221,8 @@ function lua_new_decorator(func)
     return decorator
 end
 
-function lua_set_delegate(obj, func)
-    obj.__delegation = func
+function lua_set_delegate(obj, delegation)
+    obj.__delegation = delegation
     if obj.__delegated then
         return
     end
@@ -229,8 +233,18 @@ function lua_set_delegate(obj, func)
         if v == nil and _oldMt ~= nil and _oldMt.__index ~= nil then
             v = _oldMt.__index[k]
         end
-        if v == nil and obj.__delegation then
-            v = function() return obj.__delegation(k) end
+        if v ~= nil then
+            return v
+        end
+        if is_function(obj.__delegation) then
+            v = function(...) return obj.__delegation(k, ...) end
+        elseif is_userdata(obj.__delegation) then
+            local _obj = obj.__delegation
+            if is_function(_obj[k]) then
+                v = function(_t, ...) return _obj[k](_obj, ...) end
+            else
+                v = _obj[k]
+            end
         end
         return v
     end

@@ -1,10 +1,13 @@
 
--- tools:[2025-04-29_20:08:27]
+-- tools:[2025-04-29_21:22:28]
 
 -- file:[./files/lua.lua]
 
 function null()
     return null
+end
+function is_userdata(v)
+    return type(v) == 'userdata'
 end
 function is_table(v)
     return type(v) == 'table'
@@ -199,8 +202,8 @@ function lua_new_decorator(func)
     setmetatable(decorator, {__call = _call})
     return decorator
 end
-function lua_set_delegate(obj, func)
-    obj.__delegation = func
+function lua_set_delegate(obj, delegation)
+    obj.__delegation = delegation
     if obj.__delegated then
         return
     end
@@ -211,8 +214,18 @@ function lua_set_delegate(obj, func)
         if v == nil and _oldMt ~= nil and _oldMt.__index ~= nil then
             v = _oldMt.__index[k]
         end
-        if v == nil and obj.__delegation then
-            v = function() return obj.__delegation(k) end
+        if v ~= nil then
+            return v
+        end
+        if is_function(obj.__delegation) then
+            v = function(...) return obj.__delegation(k, ...) end
+        elseif is_userdata(obj.__delegation) then
+            local _obj = obj.__delegation
+            if is_function(_obj[k]) then
+                v = function(_t, ...) return _obj[k](_obj, ...) end
+            else
+                v = _obj[k]
+            end
         end
         return v
     end
