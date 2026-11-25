@@ -69,9 +69,9 @@ function files.cwd()
     if cwd then return cwd end
     local isOk, output = nil, nil
     if tools.is_windows() then
-        isOk, output = tools.execute("cd")
+        isOk, output = tools.capture("cd")
     else
-        isOk, output = tools.execute("pwd")
+        isOk, output = tools.capture("pwd")
     end
     assert(isOk and output ~= nil)
     cwd = output:trim():slash() .. '/'
@@ -174,7 +174,7 @@ end
 
 function files.is_folder(path)
     if not path then return false end
-    local isOk, _ = tools.execute("cd " .. path)
+    local isOk, _ = tools.capture("cd " .. path)
     return isOk == true
 end
 
@@ -182,9 +182,9 @@ function files.mk_folder(path)
     if files.is_folder(path) then return end
     local isOk
     if tools.is_windows() then
-        isOk = tools.execute(string.format([[mkdir "%s"]], path))
+        isOk = tools.capture(string.format([[mkdir "%s"]], path))
     else
-        isOk = tools.execute(string.format([[mkdir -p "%s"]], path))
+        isOk = tools.capture(string.format([[mkdir -p "%s"]], path))
     end
     return isOk == true
 end
@@ -194,9 +194,9 @@ function files.list(path)
     if not files.is_folder(path) then return r end
     local isOk, out
     if tools.is_windows() then
-        isOk, out = tools.execute(string.format([[dir /b "%s"]], path))
+        isOk, out = tools.capture(string.format([[dir /b "%s"]], path))
     else
-        isOk, out = tools.execute(string.format([[ls "%s"]], path))
+        isOk, out = tools.capture(string.format([[ls "%s"]], path))
     end
     t = out:explode('\n')
     for i,v in ipairs(t) do
@@ -214,9 +214,9 @@ end
 function files.modified(path)
     local stamp = nil
     xpcall(function()
-        local isOk, result = tools.execute("stat -f %m " .. path) -- mac
+        local isOk, result = tools.capture("stat -f %m " .. path) -- mac
         if isOk then stamp = result end
-        local isOk, result = tools.execute("stat -c %Y " .. path) -- linux
+        local isOk, result = tools.capture("stat -c %Y " .. path) -- linux
         if isOk then stamp = result end
         assert(stamp ~= nil, 'get modified stamp failed')
     end, function(err)

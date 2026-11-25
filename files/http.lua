@@ -18,7 +18,7 @@ function http.download(url, path, tp)
         cmd = [[wget "%s" -O "%s"]]
     end
     cmd = string.format(cmd, url, path)
-    local isOk, output = tools.execute(cmd)
+    local isOk, output = tools.capture(cmd)
     return isOk, output, cmd
 end
 
@@ -57,7 +57,7 @@ local function curl_request(url, method, params, headers)
     --
     local cmd = [[curl "%s" -sSL --max-time 120 -o "%s" -w "%%{http_code}" -X %s%s %s]]
     cmd = string.format(cmd, url, httpRspFile, method, h, b)
-    local isOk, output = tools.execute(cmd)
+    local isOk, output = tools.capture(cmd)
     local content = files.read(httpRspFile, "rb") or ""
     files.delete(httpReqFile)
     files.delete(httpRspFile)

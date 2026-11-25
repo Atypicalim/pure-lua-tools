@@ -289,8 +289,8 @@ end
 
 function Graphic:_runScript()
     files.write("running.ps1", self._code)
-    local isOk, r = tools.execute([[ powershell.exe -file ./running.ps1]])
-    assert(isOk, 'powershell execute failed:' .. r)
+    local isOk, r = tools.capture([[ powershell.exe -file ./running.ps1]])
+    assert(isOk, 'powershell capture failed:' .. r)
     files.delete("running.ps1")
 end
 

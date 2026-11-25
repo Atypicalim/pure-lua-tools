@@ -11,7 +11,7 @@ local function shell_execute(cmd, ...)
     for _, v in ipairs({...}) do
         cmd = cmd .. ' ' .. v
     end
-    local isOk, out = tools.execute(cmd)
+    local isOk, out = tools.capture(cmd)
     return isOk, out
 end
 

@@ -39,24 +39,13 @@ function tools.capture(cmd)
 end
 
 function tools.execute(cmd)
-    local log_file = ".lua-execute-log"
-    local wrapped_cmd
+    local result
     if tools.is_windows() then
-        wrapped_cmd = string.format('(%s) > "%s" 2>&1', cmd, log_file)
+        result = os.execute([[start "" /B ]] .. cmd .. [[ >nul 2>&1]])
     else
-        wrapped_cmd = string.format('{ %s; } > "%s" 2>&1', cmd, log_file)
+        result = os.execute(cmd .. [[ >/dev/null 2>&1 &]])
     end
-    local result = os.execute(wrapped_cmd)
-    local isOk = (result == 0 or result == true)
-    local f = io.open(log_file, "rb")
-    local output = ""
-    if f then
-        output = f:read("*a") or ""
-        output = output:gsub("[\r\n]+$", "")
-        f:close()
-    end
-    os.remove(log_file)
-    return isOk, output
+    return result == 0 or result == true
 end
 
 function tools.get_timezone()
@@ -75,7 +64,7 @@ end
 
 function tools.where_is(program)
     local command = tools.is_windows() and "where" or "which"
-    local isOk, result = tools.execute(command .. [[ "]] .. program .. [["]])
+    local isOk, result = tools.capture(command .. [[ "]] .. program .. [["]])
     if isOk then
         local results = string.explode(result, "\n")
         return unpack(results)
@@ -95,5 +84,5 @@ function tools.edit_file(path)
 end
 
 function tools.open_url(url)
-    return tools.execute([[start "]] .. url .. [["]])
+    return tools.capture([[start "]] .. url .. [["]])
 end

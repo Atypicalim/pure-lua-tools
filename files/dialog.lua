@@ -90,7 +90,7 @@ local function dialog_execute_powershell(func, ...)
     for i,v in ipairs(agrs) do
         cmd = cmd .. [[ "]] .. tostring(v) .. [["]]
     end
-    local isOk, r = tools.execute([[ powershell.exe -file ./running.ps1 ]] .. cmd)
+    local isOk, r = tools.capture([[ powershell.exe -file ./running.ps1 ]] .. cmd)
     files.delete("running.ps1")
     assert(isOk, 'powershell execute failed:' .. cmd)
     return r:match(".*%[result%[(.*)%]result%].*")
@@ -167,7 +167,7 @@ end
 function dialog.open_path(path)
     if tools.is_windows() then
         path = dialog_validate_folder(path)
-        return tools.execute([[start %windir%\explorer.exe "]] .. path .. [["]])
+        return tools.capture([[start %windir%\explorer.exe "]] .. path .. [["]])
     else
         assert('open path not implemented on this platform')
     end

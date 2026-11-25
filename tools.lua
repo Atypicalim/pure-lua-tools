@@ -1,5 +1,5 @@
 
--- tools:[2026-11-25_22:39:16]
+-- tools:[2026-11-25_22:54:22]
 
 -- file:[./files/lua.lua]
 
@@ -1691,9 +1691,9 @@ function files.cwd()
     if cwd then return cwd end
     local isOk, output = nil, nil
     if tools.is_windows() then
-        isOk, output = tools.execute("cd")
+        isOk, output = tools.capture("cd")
     else
-        isOk, output = tools.execute("pwd")
+        isOk, output = tools.capture("pwd")
     end
     assert(isOk and output ~= nil)
     cwd = output:trim():slash() .. '/'
@@ -1783,16 +1783,16 @@ function files.sync(from, to)
 end
 function files.is_folder(path)
     if not path then return false end
-    local isOk, _ = tools.execute("cd " .. path)
+    local isOk, _ = tools.capture("cd " .. path)
     return isOk == true
 end
 function files.mk_folder(path)
     if files.is_folder(path) then return end
     local isOk
     if tools.is_windows() then
-        isOk = tools.execute(string.format([[mkdir "%s"]], path))
+        isOk = tools.capture(string.format([[mkdir "%s"]], path))
     else
-        isOk = tools.execute(string.format([[mkdir -p "%s"]], path))
+        isOk = tools.capture(string.format([[mkdir -p "%s"]], path))
     end
     return isOk == true
 end
@@ -1801,9 +1801,9 @@ function files.list(path)
     if not files.is_folder(path) then return r end
     local isOk, out
     if tools.is_windows() then
-        isOk, out = tools.execute(string.format([[dir /b "%s"]], path))
+        isOk, out = tools.capture(string.format([[dir /b "%s"]], path))
     else
-        isOk, out = tools.execute(string.format([[ls "%s"]], path))
+        isOk, out = tools.capture(string.format([[ls "%s"]], path))
     end
     t = out:explode('\n')
     for i,v in ipairs(t) do
@@ -1819,9 +1819,9 @@ end
 function files.modified(path)
     local stamp = nil
     xpcall(function()
-        local isOk, result = tools.execute("stat -f %m " .. path) -- mac
+        local isOk, result = tools.capture("stat -f %m " .. path) -- mac
         if isOk then stamp = result end
-        local isOk, result = tools.execute("stat -c %Y " .. path) -- linux
+        local isOk, result = tools.capture("stat -c %Y " .. path) -- linux
         if isOk then stamp = result end
         assert(stamp ~= nil, 'get modified stamp failed')
     end, function(err)
@@ -2437,7 +2437,7 @@ function http.download(url, path, tp)
         cmd = [[wget "%s" -O "%s"]]
     end
     cmd = string.format(cmd, url, path)
-    local isOk, output = tools.execute(cmd)
+    local isOk, output = tools.capture(cmd)
     return isOk, output, cmd
 end
 local function curl_request(url, method, params, headers)
@@ -2471,7 +2471,7 @@ local function curl_request(url, method, params, headers)
     end
     local cmd = [[curl "%s" -sSL --max-time 120 -o "%s" -w "%%{http_code}" -X %s%s %s]]
     cmd = string.format(cmd, url, httpRspFile, method, h, b)
-    local isOk, output = tools.execute(cmd)
+    local isOk, output = tools.capture(cmd)
     local content = files.read(httpRspFile, "rb") or ""
     files.delete(httpReqFile)
     files.delete(httpRspFile)
@@ -2575,24 +2575,13 @@ function tools.capture(cmd)
     return isOk, out
 end
 function tools.execute(cmd)
-    local log_file = ".lua-execute-log"
-    local wrapped_cmd
+    local result
     if tools.is_windows() then
-        wrapped_cmd = string.format('(%s) > "%s" 2>&1', cmd, log_file)
+        result = os.execute([[start "" /B ]] .. cmd .. [[ >nul 2>&1]])
     else
-        wrapped_cmd = string.format('{ %s; } > "%s" 2>&1', cmd, log_file)
+        result = os.execute(cmd .. [[ >/dev/null 2>&1 &]])
     end
-    local result = os.execute(wrapped_cmd)
-    local isOk = (result == 0 or result == true)
-    local f = io.open(log_file, "rb")
-    local output = ""
-    if f then
-        output = f:read("*a") or ""
-        output = output:gsub("[\r\n]+$", "")
-        f:close()
-    end
-    os.remove(log_file)
-    return isOk, output
+    return result == 0 or result == true
 end
 function tools.get_timezone()
     local now = os.time()
@@ -2608,7 +2597,7 @@ function tools.get_milliseconds()
 end
 function tools.where_is(program)
     local command = tools.is_windows() and "where" or "which"
-    local isOk, result = tools.execute(command .. [[ "]] .. program .. [["]])
+    local isOk, result = tools.capture(command .. [[ "]] .. program .. [["]])
     if isOk then
         local results = string.explode(result, "\n")
         return unpack(results)
@@ -2626,7 +2615,7 @@ function tools.edit_file(path)
     return false
 end
 function tools.open_url(url)
-    return tools.execute([[start "]] .. url .. [["]])
+    return tools.capture([[start "]] .. url .. [["]])
 end
 
 -- file:[./files/console.lua]
@@ -2952,7 +2941,7 @@ local function shell_execute(cmd, ...)
     for _, v in ipairs({...}) do
         cmd = cmd .. ' ' .. v
     end
-    local isOk, out = tools.execute(cmd)
+    local isOk, out = tools.capture(cmd)
     return isOk, out
 end
 smt.__index = function(t, cmd)
@@ -3568,8 +3557,8 @@ function Graphic:_formatPoints(points)
 end
 function Graphic:_runScript()
     files.write("running.ps1", self._code)
-    local isOk, r = tools.execute([[ powershell.exe -file ./running.ps1]])
-    assert(isOk, 'powershell execute failed:' .. r)
+    local isOk, r = tools.capture([[ powershell.exe -file ./running.ps1]])
+    assert(isOk, 'powershell capture failed:' .. r)
     files.delete("running.ps1")
 end
 function Graphic:show(title, icon)
@@ -3664,7 +3653,7 @@ local function dialog_execute_powershell(func, ...)
     for i,v in ipairs(agrs) do
         cmd = cmd .. [[ "]] .. tostring(v) .. [["]]
     end
-    local isOk, r = tools.execute([[ powershell.exe -file ./running.ps1 ]] .. cmd)
+    local isOk, r = tools.capture([[ powershell.exe -file ./running.ps1 ]] .. cmd)
     files.delete("running.ps1")
     assert(isOk, 'powershell execute failed:' .. cmd)
     return r:match(".*%[result%[(.*)%]result%].*")
@@ -3733,7 +3722,7 @@ end
 function dialog.open_path(path)
     if tools.is_windows() then
         path = dialog_validate_folder(path)
-        return tools.execute([[start %windir%\explorer.exe "]] .. path .. [["]])
+        return tools.capture([[start %windir%\explorer.exe "]] .. path .. [["]])
     else
         assert('open path not implemented on this platform')
     end
