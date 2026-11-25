@@ -12,8 +12,8 @@ end
 function json._encodeString(s)
     s = string.gsub(s, '\\', '\\\\')
     s = string.gsub(s, '"', '\\"')
-    s = string.gsub(s, "'", "\\'")
     s = string.gsub(s, '\n', '\\n')
+    s = string.gsub(s, '\r', '\\r')
     s = string.gsub(s, '\t', '\\t')
     return s
 end
@@ -98,7 +98,7 @@ function json._decode_scanNumber(s, startPos)
     local stringValue = string.sub(s, startPos, endPos - 1)
     local numberValue = tonumber(stringValue)
     assert(numberValue ~= nil, 'invalid number [ ' .. stringValue .. '] at:' .. startPos .. ' : ' .. endPos)
-    return stringEval(), endPos
+    return numberValue, endPos
 end
 
 function json._decode_scanString(s, startPos)
@@ -121,10 +121,25 @@ function json._decode_scanString(s, startPos)
         endPos = endPos + 1
         assert(endPos <= stringLen + 1, 'JSON string ended unexpectedly scanning string.')
     until bEnded
-    local stringValue = 'return ' .. string.sub(s, startPos, endPos - 1)
-    local stringEval = loadstring(stringValue)
-    assert(stringEval, 'invalid string [ ' .. stringValue .. '] at ' .. startPos .. ' : ' .. endPos)
-    return stringEval(), endPos
+    local stringValue = string.sub(s, startPos + 1, endPos - 2)
+    local mark = '\1'
+    stringValue = string.gsub(stringValue, '\\\\', mark)
+    stringValue = string.gsub(stringValue, '\\u(%x%x%x%x)\\u(%x%x%x%x)', function(hi, lo)
+        hi, lo = tonumber(hi, 16), tonumber(lo, 16)
+        if hi >= 0xD800 and hi <= 0xDBFF and lo >= 0xDC00 and lo <= 0xDFFF then
+            return string.utf8_encode(0x10000 + (hi - 0xD800) * 0x400 + (lo - 0xDC00))
+        end
+        return string.utf8_encode(hi) .. string.utf8_encode(lo)
+    end)
+    stringValue = string.gsub(stringValue, '\\u(%x%x%x%x)', function(hex)
+        return string.utf8_encode(tonumber(hex, 16))
+    end)
+    local escapes = {n='\n', r='\r', t='\t', b='\b', f='\f', ['"']='"', ['\\']='\\', ['/']='/'}
+    stringValue = string.gsub(stringValue, '\\(.)', function(c)
+        return escapes[c] or c
+    end)
+    stringValue = string.gsub(stringValue, mark, '\\')
+    return stringValue, endPos
 end
 
 function json._decode_scanComment(s, startPos)
@@ -134,11 +149,11 @@ function json._decode_scanComment(s, startPos)
 end
 
 function json._decode_scanConstants(s, startPos)
-    local constValues = {true, false, nil}
+    local constValues = {true, false, null}
     local constNames = {"true", "false", "null"}
-    for _, k in pairs(constNames) do
+    for i, k in ipairs(constNames) do
         if string.sub(s, startPos, startPos + string.len(k) - 1) == k then
-            return constValues[k], startPos + string.len(k)
+            return constValues[i], startPos + string.len(k)
         end
     end
     assert(false, 'invalid json value at:' .. startPos)

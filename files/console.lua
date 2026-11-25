@@ -317,10 +317,24 @@ function console.delete_line(count, replacement, noWrap)
     io.write(text)
 end
 
+function console.hide_cursor(isHide)
+    if isHide == nil then isHide = true end
+    io.write(isHide and "\27[?25l" or "\27[?25h")
+end
+
+function console.reset_cursor(toPosition)
+    if not toPosition or toPosition <= 0 then
+        io.write("\27[H")
+    else
+        io.write(string.format("\27[%d;1H", toPosition + 1))
+    end
+end
+
 function console.clean_screen(replacement, noWrap)
     local text = replacement or ""
     if noWrap == nil then noWrap = #text == 0 end
     text = text .. (noWrap and "" or "\n")
-    text = "\027[2J\027[1;1H" .. text
+    text = "\27[H\27[2J\27[3J" .. text
     io.write(text)
+    io.flush()
 end

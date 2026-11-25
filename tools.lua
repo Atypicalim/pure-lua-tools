@@ -1,5 +1,5 @@
 
--- tools:[2025-04-29_22:21:33]
+-- tools:[2026-11-25_22:39:16]
 
 -- file:[./files/lua.lua]
 
@@ -412,6 +412,157 @@ function string.render(this, ...)
         return args[key] and tostring(args[key]) or "{" .. key .. "}"
     end)
     return result
+end
+function string.utf8_encode(code)
+    assert(is_number(code) and code % 1 == 0, 'invalid unicode code point')
+    assert(code >= 0 and code <= 0x10FFFF, 'invalid unicode code point')
+    assert(code < 0xD800 or code > 0xDFFF, 'invalid unicode surrogate')
+    if code <= 0x7F then
+        return string.char(code)
+    elseif code <= 0x7FF then
+        return string.char(0xC0 + math.floor(code / 0x40), 0x80 + code % 0x40)
+    elseif code <= 0xFFFF then
+        return string.char(0xE0 + math.floor(code / 0x1000),
+            0x80 + math.floor(code / 0x40) % 0x40, 0x80 + code % 0x40)
+    end
+    return string.char(0xF0 + math.floor(code / 0x40000),
+        0x80 + math.floor(code / 0x1000) % 0x40,
+        0x80 + math.floor(code / 0x40) % 0x40, 0x80 + code % 0x40)
+end
+function string.utf8_read(this, index)
+    local b = string.byte(this, index)
+    local code, size
+    if b < 0x80 then
+        code, size = b, 1
+    elseif b >= 0xC2 and b <= 0xDF then
+        code, size = b % 0x20, 2
+    elseif b >= 0xE0 and b <= 0xEF then
+        code, size = b % 0x10, 3
+    elseif b >= 0xF0 and b <= 0xF4 then
+        code, size = b % 0x08, 4
+    else
+        error('invalid utf8 leading byte at ' .. index)
+    end
+    assert(index + size - 1 <= #this, 'truncated utf8 sequence at ' .. index)
+    for i = index + 1, index + size - 1 do
+        local nextByte = string.byte(this, i)
+        assert(nextByte >= 0x80 and nextByte <= 0xBF, 'invalid utf8 continuation byte at ' .. i)
+        code = code * 0x40 + nextByte % 0x40
+    end
+    if size == 2 then
+        assert(code >= 0x80, 'overlong utf8 sequence at ' .. index)
+    elseif size == 3 then
+        assert(code >= 0x800, 'overlong utf8 sequence at ' .. index)
+    elseif size == 4 then
+        assert(code >= 0x10000, 'overlong utf8 sequence at ' .. index)
+    end
+    assert(code < 0xD800 or code > 0xDFFF, 'invalid unicode surrogate at ' .. index)
+    assert(code <= 0x10FFFF, 'invalid unicode code point at ' .. index)
+    return code, size
+end
+function string.utf8_decode(this)
+    assert(is_string(this))
+    local codes = table.new()
+    local index = 1
+    while index <= #this do
+        local code, size = string.utf8_read(this, index)
+        table.insert(codes, code)
+        index = index + size
+    end
+    return codes
+end
+function string.utf8_len(this)
+    assert(is_string(this))
+    local count = 0
+    for i = 1, #this do
+        local b = string.byte(this, i)
+        if b < 0x80 or b >= 0xC0 then
+            count = count + 1
+        end
+    end
+    return count
+end
+function string.utf8_find(this, charIndex)
+    assert(is_string(this))
+    assert(is_number(charIndex) and charIndex % 1 == 0 and charIndex ~= 0, 'invalid character index')
+    if charIndex < 0 then
+        charIndex = string.utf8_len(this) + charIndex + 1
+    end
+    if charIndex < 1 then return nil end
+    local current = 0
+    local index = 1
+    while index <= #this do
+        local b = string.byte(this, index)
+        local size = 1
+        if b >= 0xC2 and b <= 0xDF then
+            size = 2
+        elseif b >= 0xE0 and b <= 0xEF then
+            size = 3
+        elseif b >= 0xF0 and b <= 0xF4 then
+            size = 4
+        end
+        current = current + 1
+        if current == charIndex then
+            return index, math.min(index + size - 1, #this)
+        end
+        index = index + size
+    end
+end
+function string.utf8_sub(this, first, last)
+    assert(is_string(this))
+    first = first or 1
+    last = last or -1
+    local length = string.utf8_len(this)
+    if first < 0 then first = length + first + 1 end
+    if last < 0 then last = length + last + 1 end
+    if first < 1 then first = 1 end
+    if last > length then last = length end
+    if first > last or first > length or last < 1 then
+        return ""
+    end
+    local from = string.utf8_find(this, first)
+    local _, to = string.utf8_find(this, last)
+    return string.sub(this, from, to)
+end
+function string.utf8_codepoint(this, charIndex)
+    assert(is_string(this))
+    charIndex = charIndex or 1
+    assert(is_number(charIndex) and charIndex % 1 == 0 and charIndex ~= 0, 'invalid character index')
+    local index = string.utf8_find(this, charIndex)
+    assert(index ~= nil, 'invalid character index')
+    local code = string.utf8_read(this, index)
+    return code
+end
+function string.utf8_codes(this)
+    assert(is_string(this))
+    local index = 1
+    return function()
+        if index > #this then return nil end
+        local position = index
+        local code, size = string.utf8_read(this, index)
+        index = index + size
+        return position, code
+    end
+end
+function string.utf8_valid(this)
+    assert(is_string(this))
+    local isOk = pcall(string.utf8_decode, this)
+    return isOk
+end
+function string.utf8_reverse(this)
+    assert(is_string(this))
+    local chars = table.new()
+    local index = 1
+    while index <= #this do
+        local code, size = string.utf8_read(this, index)
+        table.insert(chars, string.utf8_encode(code))
+        index = index + size
+    end
+    local result = table.new()
+    for i = #chars, 1, -1 do
+        table.insert(result, chars[i])
+    end
+    return table.concat(result)
 end
 
 -- file:[./files/table.lua]
@@ -849,8 +1000,8 @@ end
 function json._encodeString(s)
     s = string.gsub(s, '\\', '\\\\')
     s = string.gsub(s, '"', '\\"')
-    s = string.gsub(s, "'", "\\'")
     s = string.gsub(s, '\n', '\\n')
+    s = string.gsub(s, '\r', '\\r')
     s = string.gsub(s, '\t', '\\t')
     return s
 end
@@ -929,7 +1080,7 @@ function json._decode_scanNumber(s, startPos)
     local stringValue = string.sub(s, startPos, endPos - 1)
     local numberValue = tonumber(stringValue)
     assert(numberValue ~= nil, 'invalid number [ ' .. stringValue .. '] at:' .. startPos .. ' : ' .. endPos)
-    return stringEval(), endPos
+    return numberValue, endPos
 end
 function json._decode_scanString(s, startPos)
     local startChar = string.sub(s, startPos, startPos)
@@ -951,10 +1102,25 @@ function json._decode_scanString(s, startPos)
         endPos = endPos + 1
         assert(endPos <= stringLen + 1, 'JSON string ended unexpectedly scanning string.')
     until bEnded
-    local stringValue = 'return ' .. string.sub(s, startPos, endPos - 1)
-    local stringEval = loadstring(stringValue)
-    assert(stringEval, 'invalid string [ ' .. stringValue .. '] at ' .. startPos .. ' : ' .. endPos)
-    return stringEval(), endPos
+    local stringValue = string.sub(s, startPos + 1, endPos - 2)
+    local mark = '\1'
+    stringValue = string.gsub(stringValue, '\\\\', mark)
+    stringValue = string.gsub(stringValue, '\\u(%x%x%x%x)\\u(%x%x%x%x)', function(hi, lo)
+        hi, lo = tonumber(hi, 16), tonumber(lo, 16)
+        if hi >= 0xD800 and hi <= 0xDBFF and lo >= 0xDC00 and lo <= 0xDFFF then
+            return string.utf8_encode(0x10000 + (hi - 0xD800) * 0x400 + (lo - 0xDC00))
+        end
+        return string.utf8_encode(hi) .. string.utf8_encode(lo)
+    end)
+    stringValue = string.gsub(stringValue, '\\u(%x%x%x%x)', function(hex)
+        return string.utf8_encode(tonumber(hex, 16))
+    end)
+    local escapes = {n='\n', r='\r', t='\t', b='\b', f='\f', ['"']='"', ['\\']='\\', ['/']='/'}
+    stringValue = string.gsub(stringValue, '\\(.)', function(c)
+        return escapes[c] or c
+    end)
+    stringValue = string.gsub(stringValue, mark, '\\')
+    return stringValue, endPos
 end
 function json._decode_scanComment(s, startPos)
     local endPos = string.find(s, '*/', startPos + 2)
@@ -962,11 +1128,11 @@ function json._decode_scanComment(s, startPos)
     return json._decode(s, endPos + 2)
 end
 function json._decode_scanConstants(s, startPos)
-    local constValues = {true, false, nil}
+    local constValues = {true, false, null}
     local constNames = {"true", "false", "null"}
-    for _, k in pairs(constNames) do
+    for i, k in ipairs(constNames) do
         if string.sub(s, startPos, startPos + string.len(k) - 1) == k then
-            return constValues[k], startPos + string.len(k)
+            return constValues[i], startPos + string.len(k)
         end
     end
     assert(false, 'invalid json value at:' .. startPos)
@@ -2275,42 +2441,45 @@ function http.download(url, path, tp)
     return isOk, output, cmd
 end
 local function curl_request(url, method, params, headers)
-    local httpContentFile = "./.lua.http.log"
-    files.delete(httpContentFile)
+    local httpReqFile = "./.lua.http.req"
+    local httpRspFile = "./.lua.http.rsp"
+    files.delete(httpReqFile)
+    files.delete(httpRspFile)
     local h = ""
     for k,v in pairs(headers) do
         assert(is_string(k))
         assert(is_string(v) or is_number(v))
-        if h ~= "" then
-            h = h .. ";"
-        end
-        h = h .. "-H '" .. tostring(k) .. ":" .. tostring(v) .. "'"
+        local header = tostring(k) .. ":" .. tostring(v)
+        header = string.gsub(header, "[\r\n]+", " ")
+        h = h .. string.format([[ -H "%s"]], header)
     end
     local b = ""
     if method == "GET" then
+        local query = {}
         for k,v in pairs(params) do
-            if not string.find(url, "?") then url = url .. "?" end
             assert(is_string(k))
             assert(is_string(v) or is_number(v))
-            url = url .. tostring(k) ..  "=" .. tostring(v)
+            table.insert(query, tostring(k) .. "=" .. tostring(v))
+        end
+        if #query > 0 then
+            url = url .. (string.find(url, "?", 1, true) and "&" or "?")
+            url = url .. table.concat(query, "&")
         end
     elseif method == "POST" then
-        b = string.format("-d '%s'", json.encode(params))
+        files.write(httpReqFile, json.encode(params), "wb")
+        b = string.format([[--data-binary @"%s"]], httpReqFile)
     end
-    local cmd = [[curl "%s" -i  --silent -o "%s" -X %s "%s" -d "%s"]]
-    cmd = string.format(cmd, url, httpContentFile, method, h, b)
+    local cmd = [[curl "%s" -sSL --max-time 120 -o "%s" -w "%%{http_code}" -X %s%s %s]]
+    cmd = string.format(cmd, url, httpRspFile, method, h, b)
     local isOk, output = tools.execute(cmd)
-    local content = files.read(httpContentFile) or ""
-    files.delete(httpContentFile)
-    local contents = string.explode(content, "\n%s*\n", 1)
-    local head = contents[1] or ""
-    local body = contents[2] or ""
-    local from, to = string.find(head, 'HTTP.*%s%d%d%d')
-    local code = (from and to) and tonumber(string.sub(head, to - 3, to) or "") or -1
-    if not isOk or code < 0 then
-        return -1, output
+    local content = files.read(httpRspFile, "rb") or ""
+    files.delete(httpReqFile)
+    files.delete(httpRspFile)
+    local code = isOk and tonumber(string.match(output, "(%d%d%d)%s*$")) or -1
+    if code <= 0 then
+        return code, output
     else
-        return code, body
+        return code, content
     end
 end
 local function http_request(url, method, params, headers)
@@ -2393,7 +2562,7 @@ function tools.is_mac()
     isLinux = not tools.is_windows() and string.find(os.getenv("HOME") or "", '/Users/') ~= nil
     return isLinux
 end
-function tools.execute(cmd)
+function tools.capture(cmd)
     local flag = "::MY_ERROR_FLAG::"
     local file = io.popen(cmd .. [[ 2>&1 || echo ]] .. flag, "r")
     local out = file:read("*all"):trim()
@@ -2404,6 +2573,26 @@ function tools.execute(cmd)
     file:close()
     out = out:trim()
     return isOk, out
+end
+function tools.execute(cmd)
+    local log_file = ".lua-execute-log"
+    local wrapped_cmd
+    if tools.is_windows() then
+        wrapped_cmd = string.format('(%s) > "%s" 2>&1', cmd, log_file)
+    else
+        wrapped_cmd = string.format('{ %s; } > "%s" 2>&1', cmd, log_file)
+    end
+    local result = os.execute(wrapped_cmd)
+    local isOk = (result == 0 or result == true)
+    local f = io.open(log_file, "rb")
+    local output = ""
+    if f then
+        output = f:read("*a") or ""
+        output = output:gsub("[\r\n]+$", "")
+        f:close()
+    end
+    os.remove(log_file)
+    return isOk, output
 end
 function tools.get_timezone()
     local now = os.time()
@@ -2734,12 +2923,24 @@ function console.delete_line(count, replacement, noWrap)
     text = line <= 0 and text or string.format("\027[%dF\027[0J", line) .. text
     io.write(text)
 end
+function console.hide_cursor(isHide)
+    if isHide == nil then isHide = true end
+    io.write(isHide and "\27[?25l" or "\27[?25h")
+end
+function console.reset_cursor(toPosition)
+    if not toPosition or toPosition <= 0 then
+        io.write("\27[H")
+    else
+        io.write(string.format("\27[%d;1H", toPosition + 1))
+    end
+end
 function console.clean_screen(replacement, noWrap)
     local text = replacement or ""
     if noWrap == nil then noWrap = #text == 0 end
     text = text .. (noWrap and "" or "\n")
-    text = "\027[2J\027[1;1H" .. text
+    text = "\27[H\27[2J\27[3J" .. text
     io.write(text)
+    io.flush()
 end
 
 -- file:[./files/shell.lua]

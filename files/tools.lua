@@ -25,7 +25,7 @@ function tools.is_mac()
     return isLinux
 end
 
-function tools.execute(cmd)
+function tools.capture(cmd)
     local flag = "::MY_ERROR_FLAG::"
     local file = io.popen(cmd .. [[ 2>&1 || echo ]] .. flag, "r")
     local out = file:read("*all"):trim()
@@ -36,6 +36,27 @@ function tools.execute(cmd)
     file:close()
     out = out:trim()
     return isOk, out
+end
+
+function tools.execute(cmd)
+    local log_file = ".lua-execute-log"
+    local wrapped_cmd
+    if tools.is_windows() then
+        wrapped_cmd = string.format('(%s) > "%s" 2>&1', cmd, log_file)
+    else
+        wrapped_cmd = string.format('{ %s; } > "%s" 2>&1', cmd, log_file)
+    end
+    local result = os.execute(wrapped_cmd)
+    local isOk = (result == 0 or result == true)
+    local f = io.open(log_file, "rb")
+    local output = ""
+    if f then
+        output = f:read("*a") or ""
+        output = output:gsub("[\r\n]+$", "")
+        f:close()
+    end
+    os.remove(log_file)
+    return isOk, output
 end
 
 function tools.get_timezone()

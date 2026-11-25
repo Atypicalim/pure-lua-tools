@@ -24,45 +24,48 @@ end
 
 local function curl_request(url, method, params, headers)
     --
-    local httpContentFile = "./.lua.http.log"
-    files.delete(httpContentFile)
+    local httpReqFile = "./.lua.http.req"
+    local httpRspFile = "./.lua.http.rsp"
+    files.delete(httpReqFile)
+    files.delete(httpRspFile)
     --
     local h = ""
     for k,v in pairs(headers) do
         assert(is_string(k))
         assert(is_string(v) or is_number(v))
-        if h ~= "" then
-            h = h .. ";"
-        end
-        h = h .. "-H '" .. tostring(k) .. ":" .. tostring(v) .. "'"
+        local header = tostring(k) .. ":" .. tostring(v)
+        header = string.gsub(header, "[\r\n]+", " ")
+        h = h .. string.format([[ -H "%s"]], header)
     end
     --
     local b = ""
     if method == "GET" then
+        local query = {}
         for k,v in pairs(params) do
-            if not string.find(url, "?") then url = url .. "?" end
             assert(is_string(k))
             assert(is_string(v) or is_number(v))
-            url = url .. tostring(k) ..  "=" .. tostring(v)
+            table.insert(query, tostring(k) .. "=" .. tostring(v))
+        end
+        if #query > 0 then
+            url = url .. (string.find(url, "?", 1, true) and "&" or "?")
+            url = url .. table.concat(query, "&")
         end
     elseif method == "POST" then
-        b = string.format("-d '%s'", json.encode(params))
+        files.write(httpReqFile, json.encode(params), "wb")
+        b = string.format([[--data-binary @"%s"]], httpReqFile)
     end
     --
-    local cmd = [[curl "%s" -i  --silent -o "%s" -X %s "%s" -d "%s"]]
-    cmd = string.format(cmd, url, httpContentFile, method, h, b)
+    local cmd = [[curl "%s" -sSL --max-time 120 -o "%s" -w "%%{http_code}" -X %s%s %s]]
+    cmd = string.format(cmd, url, httpRspFile, method, h, b)
     local isOk, output = tools.execute(cmd)
-    local content = files.read(httpContentFile) or ""
-    files.delete(httpContentFile)
-    local contents = string.explode(content, "\n%s*\n", 1)
-    local head = contents[1] or ""
-    local body = contents[2] or ""
-    local from, to = string.find(head, 'HTTP.*%s%d%d%d')
-    local code = (from and to) and tonumber(string.sub(head, to - 3, to) or "") or -1
-    if not isOk or code < 0 then
-        return -1, output
+    local content = files.read(httpRspFile, "rb") or ""
+    files.delete(httpReqFile)
+    files.delete(httpRspFile)
+    local code = isOk and tonumber(string.match(output, "(%d%d%d)%s*$")) or -1
+    if code <= 0 then
+        return code, output
     else
-        return code, body
+        return code, content
     end
 end
 
